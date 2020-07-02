@@ -1,4 +1,7 @@
-ZAAKTYPE_MAP = {"url": "drc:zaaktype__url", "identificatie": "drc:zaaktype__identificatie"}
+ZAAKTYPE_MAP = {
+    "url": "drc:zaaktype__url",
+    "identificatie": "drc:zaaktype__identificatie",
+}
 
 ZAAK_MAP = {
     "url": "drc:zaak__url",
@@ -67,7 +70,9 @@ REVERSE_ZAAK_MAP = {value: key for key, value in ZAAK_MAP.items()}
 REVERSE_DOCUMENT_MAP = {value: key for key, value in DOCUMENT_MAP.items()}
 REVERSE_CONNECTION_MAP = {value: key for key, value in CONNECTION_MAP.items()}
 REVERSE_GEBRUIKSRECHTEN_MAP = {value: key for key, value in GEBRUIKSRECHTEN_MAP.items()}
-REVERSE_OBJECTINFORMATIEOBJECT_MAP = {value: key for key, value in OBJECTINFORMATIEOBJECT_MAP.items()}
+REVERSE_OBJECTINFORMATIEOBJECT_MAP = {
+    value: key for key, value in OBJECTINFORMATIEOBJECT_MAP.items()
+}
 
 
 def mapper(drc_name, type="document"):

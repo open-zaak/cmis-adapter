@@ -2,7 +2,7 @@
 Documenten API CMIS adapter
 ===========================
 
-:Version: 0.3.4
+:Version: 0.4.0
 :Source: https://github.com/GemeenteUtrecht/gemma-drc-cmis
 :Keywords: CMIS, Documenten API, VNG, Common Ground
 :PythonVersion: 3.7

@@ -3,11 +3,11 @@ from io import BytesIO
 from django.test import TestCase
 from django.utils import timezone
 
-from tests.tests.factories import EnkelvoudigInformatieObjectFactory
-from tests.tests.mixins import DMSMixin
-
 from drc_cmis.backend import CMISDRCStorageBackend
 from drc_cmis.client import CMISDRCClient
+
+from .factories import EnkelvoudigInformatieObjectFactory
+from .mixins import DMSMixin
 
 
 class CMISCreateConnectionTests(DMSMixin, TestCase):
@@ -45,11 +45,16 @@ class CMISCreateConnectionTests(DMSMixin, TestCase):
         eio = EnkelvoudigInformatieObjectFactory(identificatie="test")
         eio_dict = eio.__dict__
 
-        document = self.backend.create_document(eio_dict.copy(), BytesIO(b"some content"))
+        document = self.backend.create_document(
+            eio_dict.copy(), BytesIO(b"some content")
+        )
         self.assertIsNotNone(document)
 
         connection = self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            }
         )
         self.assertIsNotNone(connection)
 
@@ -114,11 +119,17 @@ class CMISCreateConnectionTests(DMSMixin, TestCase):
         self.assertIsNotNone(document)
 
         connection1 = self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            }
         )
 
         connection2 = self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid2"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid2",
+            }
         )
 
         self.assertIsNotNone(connection1)

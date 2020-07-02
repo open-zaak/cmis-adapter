@@ -26,8 +26,14 @@ class CMISGebruiksrechtenTests(TestCase):
         cmis_gebruikrechten = self.client.create_cmis_gebruiksrechten(data)
 
         self.assertEqual(data["informatieobject"], cmis_gebruikrechten.informatieobject)
-        self.assertEqual(data["startdatum"], convert_timestamp_to_json_datetime(cmis_gebruikrechten.startdatum))
-        self.assertEqual(data["omschrijving_voorwaarden"], cmis_gebruikrechten.omschrijving_voorwaarden)
+        self.assertEqual(
+            data["startdatum"],
+            convert_timestamp_to_json_datetime(cmis_gebruikrechten.startdatum),
+        )
+        self.assertEqual(
+            data["omschrijving_voorwaarden"],
+            cmis_gebruikrechten.omschrijving_voorwaarden,
+        )
 
     def test_get_all(self):
         data = {
@@ -59,9 +65,17 @@ class CMISGebruiksrechtenTests(TestCase):
 
         retrieved_gebruiksrechten = self.client.get_a_cmis_gebruiksrechten(uuid)
 
-        self.assertEqual(data["informatieobject"], retrieved_gebruiksrechten.informatieobject)
-        self.assertEqual(data["startdatum"], convert_timestamp_to_json_datetime(retrieved_gebruiksrechten.startdatum))
-        self.assertEqual(data["omschrijving_voorwaarden"], retrieved_gebruiksrechten.omschrijving_voorwaarden)
+        self.assertEqual(
+            data["informatieobject"], retrieved_gebruiksrechten.informatieobject
+        )
+        self.assertEqual(
+            data["startdatum"],
+            convert_timestamp_to_json_datetime(retrieved_gebruiksrechten.startdatum),
+        )
+        self.assertEqual(
+            data["omschrijving_voorwaarden"],
+            retrieved_gebruiksrechten.omschrijving_voorwaarden,
+        )
 
     def test_delete(self):
 
@@ -87,6 +101,8 @@ def convert_timestamp_to_json_datetime(timestamp):
     """
     if timestamp is not None:
         timestamp = int(str(timestamp)[:10])
-        django_datetime = timezone.make_aware(datetime.datetime.fromtimestamp(timestamp)) + datetime.timedelta(hours=6)
+        django_datetime = timezone.make_aware(
+            datetime.datetime.fromtimestamp(timestamp)
+        ) + datetime.timedelta(hours=6)
         json_datetime = django_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
         return json_datetime

@@ -54,6 +54,12 @@ class CMISConfig(AppConfig):
         The maps are now configurable through a json file, so once the maps are initialised,
         the reverse maps need to be updated
         """
-        mapper.REVERSE_DOCUMENT_MAP = {value: key for key, value in DOCUMENT_MAP.items()}
-        mapper.REVERSE_GEBRUIKSRECHTEN_MAP = {value: key for key, value in GEBRUIKSRECHTEN_MAP.items()}
-        mapper.REVERSE_OBJECTINFORMATIEOBJECT_MAP = {value: key for key, value in OBJECTINFORMATIEOBJECT_MAP.items()}
+        mapper.REVERSE_DOCUMENT_MAP = {
+            value: key for key, value in DOCUMENT_MAP.items()
+        }
+        mapper.REVERSE_GEBRUIKSRECHTEN_MAP = {
+            value: key for key, value in GEBRUIKSRECHTEN_MAP.items()
+        }
+        mapper.REVERSE_OBJECTINFORMATIEOBJECT_MAP = {
+            value: key for key, value in OBJECTINFORMATIEOBJECT_MAP.items()
+        }

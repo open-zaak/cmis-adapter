@@ -15,13 +15,19 @@ class Migration(migrations.Migration):
             model_name="cmisconfig",
             name="base_folder",
             field=models.CharField(
-                default="DRC", help_text="Name of the DMS folder in which the documents will be stored.", max_length=200
+                default="DRC",
+                help_text="Name of the DMS folder in which the documents will be stored.",
+                max_length=200,
             ),
         ),
         migrations.AlterField(
             model_name="cmisconfig",
             name="client_password",
-            field=models.CharField(default="admin", help_text="Password for logging into DMS", max_length=200),
+            field=models.CharField(
+                default="admin",
+                help_text="Password for logging into DMS",
+                max_length=200,
+            ),
         ),
         migrations.AlterField(
             model_name="cmisconfig",
@@ -34,7 +40,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="cmisconfig",
             name="client_user",
-            field=models.CharField(default="admin", help_text="Username for logging into DMS", max_length=200),
+            field=models.CharField(
+                default="admin",
+                help_text="Username for logging into DMS",
+                max_length=200,
+            ),
         ),
         migrations.DeleteModel(name="CMISFolderLocation",),
     ]

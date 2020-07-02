@@ -10,8 +10,6 @@ SITE_ID = 1
 IS_HTTPS = False
 
 INSTALLED_APPS = [
-    "drc_cmis",
-    "tests.app",
     "vng_api_common",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -20,6 +18,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
+    "drc_cmis",
+    "test_app.app",
 ]
 
 MIDDLEWARE = [
@@ -32,11 +32,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-TEST_RUNNER = "xmlrunner.extra.djangotestrunner.XMLTestRunner"
-TEST_OUTPUT_DIR = "reports"
-TEST_OUTPUT_FILE_NAME = "junit.xml"
-
-ROOT_URLCONF = "tests.urls"
+ROOT_URLCONF = "test_app.urls"
 
 DEBUG = True
 SECRET_KEY = "this-is-really-not-a-secret"
@@ -44,10 +40,12 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 STATIC_URL = "/static/"
 
-DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": os.path.join(PROJECT_DIR, "database.db"),}}
-
-
-STATIC_URL = "/static/"
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.path.join(PROJECT_DIR, "database.db"),
+    },
+}
 
 TEMPLATES = [
     {
@@ -67,4 +65,4 @@ TEMPLATES = [
     },
 ]
 
-DMS_MAPPER_CONFIG = os.path.join(PROJECT_DIR, "cmis_mapper.json")
+CMIS_MAPPER_FILE = os.path.join(PROJECT_DIR, "cmis_mapper.json")

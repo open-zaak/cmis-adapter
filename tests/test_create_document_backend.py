@@ -3,10 +3,11 @@ from io import BytesIO
 from django.test import TestCase
 
 from rest_framework.exceptions import ErrorDetail
-from tests.tests.factories import EnkelvoudigInformatieObjectFactory
-from tests.tests.mixins import DMSMixin
 
 from drc_cmis.backend import BackendException, CMISDRCStorageBackend
+
+from .factories import EnkelvoudigInformatieObjectFactory
+from .mixins import DMSMixin
 
 
 class CMISCreateDocumentTests(DMSMixin, TestCase):
@@ -18,7 +19,9 @@ class CMISCreateDocumentTests(DMSMixin, TestCase):
     # CREATE DOCUMENT TESTS
     def test_create_document(self):
         eio = EnkelvoudigInformatieObjectFactory()
-        document = self.backend.create_document(eio.__dict__.copy(), BytesIO(b"some content"))
+        document = self.backend.create_document(
+            eio.__dict__.copy(), BytesIO(b"some content")
+        )
         self.assertIsNotNone(document)
 
     # TODO: Change the workings
@@ -40,7 +43,9 @@ class CMISCreateDocumentTests(DMSMixin, TestCase):
         eio_dict = eio.__dict__
         eio_dict["identificatie"] = "test"
 
-        document = self.backend.create_document(eio_dict.copy(), BytesIO(b"some content"))
+        document = self.backend.create_document(
+            eio_dict.copy(), BytesIO(b"some content")
+        )
         self.assertIsNotNone(document)
 
         eio_dict["titel"] = "gewoon_een_andere_titel"
@@ -50,5 +55,10 @@ class CMISCreateDocumentTests(DMSMixin, TestCase):
             self.backend.create_document(eio_dict.copy(), BytesIO(b"some content"))
         self.assertEqual(
             exception.exception.detail,
-            {None: ErrorDetail(string=f"Document identificatie {eio.identificatie} is niet uniek", code="invalid")},
+            {
+                None: ErrorDetail(
+                    string=f"Document identificatie {eio.identificatie} is niet uniek",
+                    code="invalid",
+                )
+            },
         )

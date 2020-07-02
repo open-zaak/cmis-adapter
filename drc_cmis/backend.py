@@ -34,7 +34,14 @@ logger = logging.getLogger(__name__)
 
 class BackendException(ValidationError):
     def __init__(
-        self, detail, create=False, update=False, retreive_single=False, delete=False, retreive_list=False, code=None
+        self,
+        detail,
+        create=False,
+        update=False,
+        retreive_single=False,
+        delete=False,
+        retreive_list=False,
+        code=None,
     ):
         self.create = create
         self.update = update
@@ -83,7 +90,9 @@ class CMISDRCStorageBackend:
 
         try:
             cmis_doc = self.cmis_client.create_document(identification, data, content)
-            dict_doc = make_enkelvoudiginformatieobject_dataclass(cmis_doc, self.eio_dataclass)
+            dict_doc = make_enkelvoudiginformatieobject_dataclass(
+                cmis_doc, self.eio_dataclass
+            )
             logger.debug(f"CMIS_BACKEND: create_document {identification} successful")
             return dict_doc
         except UpdateConflictException:
@@ -105,15 +114,21 @@ class CMISDRCStorageBackend:
         """
         print("get_documents")
         logger.debug("CMIS_BACKEND: get_documents start")
-        cmis_documents = self.cmis_client.get_cmis_documents(filters=filters, page=page, results_per_page=page_size)
+        cmis_documents = self.cmis_client.get_cmis_documents(
+            filters=filters, page=page, results_per_page=page_size
+        )
         print(cmis_documents)
         documents_data = []
         for cmis_doc in cmis_documents["results"]:
-            dict_document = make_enkelvoudiginformatieobject_dataclass(cmis_doc, self.eio_dataclass)
+            dict_document = make_enkelvoudiginformatieobject_dataclass(
+                cmis_doc, self.eio_dataclass
+            )
             if dict_document:
                 documents_data.append(dict_document)
         print(documents_data)
-        paginated_result = self.pagination_dataclass(count=cmis_documents["total_count"], results=documents_data,)
+        paginated_result = self.pagination_dataclass(
+            count=cmis_documents["total_count"], results=documents_data,
+        )
 
         logger.debug("CMIS_BACKEND: get_documents successful")
         return paginated_result
@@ -136,10 +151,14 @@ class CMISDRCStorageBackend:
         try:
             cmis_document = self.cmis_client.get_cmis_document(uuid)
         except DocumentDoesNotExistError as e:
-            raise self.exception_class({None: e.message}, create=True, code="document-does-not-exist")
+            raise self.exception_class(
+                {None: e.message}, create=True, code="document-does-not-exist"
+            )
         else:
             logger.debug(f"CMIS_BACKEND: get_document {uuid} successful")
-            doc = make_enkelvoudiginformatieobject_dataclass(cmis_document, self.eio_dataclass)
+            doc = make_enkelvoudiginformatieobject_dataclass(
+                cmis_document, self.eio_dataclass
+            )
             return doc
 
     def get_document_content(self, uuid):
@@ -172,16 +191,24 @@ class CMISDRCStorageBackend:
         """
         logger.debug(f"CMIS_BACKEND: update_document {uuid} start")
         try:
-            cmis_document = self.cmis_client.update_cmis_document(uuid, lock, data, content)
+            cmis_document = self.cmis_client.update_cmis_document(
+                uuid, lock, data, content
+            )
         except DocumentDoesNotExistError as e:
             raise self.exception_class({None: e.message}, update=True)
         except DocumentNotLockedException as e:
-            raise self.exception_class({None: e.message}, update=True, code="not-locked")
+            raise self.exception_class(
+                {None: e.message}, update=True, code="not-locked"
+            )
         except DocumentLockConflictException as e:
-            raise self.exception_class({None: e.message}, update=True, code="wrong-lock")
+            raise self.exception_class(
+                {None: e.message}, update=True, code="wrong-lock"
+            )
         else:
             logger.debug(f"CMIS_BACKEND: update_document {uuid} successful")
-            return make_enkelvoudiginformatieobject_dataclass(cmis_document, self.eio_dataclass)
+            return make_enkelvoudiginformatieobject_dataclass(
+                cmis_document, self.eio_dataclass
+            )
 
     def delete_document(self, uuid):
         """
@@ -204,7 +231,9 @@ class CMISDRCStorageBackend:
             raise self.exception_class({None: e.message}, create=True)
         else:
             logger.debug(f"CMIS_BACKEND: delete_document {uuid} successful")
-            return make_enkelvoudiginformatieobject_dataclass(cmis_document, self.eio_dataclass, skip_deleted=True)
+            return make_enkelvoudiginformatieobject_dataclass(
+                cmis_document, self.eio_dataclass, skip_deleted=True
+            )
 
     def obliterate_document(self, uuid: str) -> None:
         """
@@ -235,11 +264,15 @@ class CMISDRCStorageBackend:
         logger.debug("CMIS checkout of document %s (lock value %s)", uuid, lock)
         cmis_doc = self.cmis_client.get_cmis_document(uuid)
 
-        already_locked = self.exception_class(detail="Document was already checked out", code="double_lock")
+        already_locked = self.exception_class(
+            detail="Document was already checked out", code="double_lock"
+        )
 
         try:
             pwc = cmis_doc.checkout()
-            assert pwc.isPrivateWorkingCopy, "checkout result must be a private working copy"
+            assert (
+                pwc.isPrivateWorkingCopy
+            ), "checkout result must be a private working copy"
             if pwc.lock:
                 raise already_locked
 
@@ -248,7 +281,9 @@ class CMISDRCStorageBackend:
         except CmisUpdateConflictException as exc:
             raise already_locked from exc
 
-        logger.debug("CMIS checkout of document %s with lock value %s succeeded", uuid, lock)
+        logger.debug(
+            "CMIS checkout of document %s with lock value %s succeeded", uuid, lock
+        )
 
     def unlock_document(self, uuid, lock, force=False):
         logger.debug(f"CMIS_BACKEND: unlock_document {uuid} start with: {lock}")
@@ -259,9 +294,13 @@ class CMISDRCStorageBackend:
             pwc.update_properties({mapper("lock"): ""})
             new_doc = pwc.checkin("Updated via Documenten API")
             logger.debug("Unlocked document with UUID %s (forced: %s)", uuid, force)
-            return make_enkelvoudiginformatieobject_dataclass(new_doc, self.eio_dataclass, skip_deleted=True)
+            return make_enkelvoudiginformatieobject_dataclass(
+                new_doc, self.eio_dataclass, skip_deleted=True
+            )
 
-        raise self.exception_class(detail=_("Lock did not match"), update=True, code="unlock-failed")
+        raise self.exception_class(
+            detail=_("Lock did not match"), update=True, code="unlock-failed"
+        )
 
     ################################################################################################
     # Splits #######################################################################################
@@ -285,13 +324,17 @@ class CMISDRCStorageBackend:
         """
         if not data.get("registratiedatum"):
             data["registratiedatum"] = timezone.now()
-        logger.debug(f"CMIS_BACKEND: create_document_case_connection {data['registratiedatum']} start")
+        logger.debug(
+            f"CMIS_BACKEND: create_document_case_connection {data['registratiedatum']} start"
+        )
 
         document_id = data.get("informatieobject").split("/")[-1]
         try:
             cmis_doc = self.cmis_client.get_cmis_document(document_id)
             if cmis_doc.object == data.get("object"):
-                raise self.exception_class(detail=_("connection is not unique"), code="unique")
+                raise self.exception_class(
+                    detail=_("connection is not unique"), code="unique"
+                )
         except DocumentDoesNotExistError:
             assert False, "Error hier"
 
@@ -310,8 +353,12 @@ class CMISDRCStorageBackend:
         else:
             cmis_doc = self.cmis_client.copy_document(cmis_doc, folder, data)
 
-        objectinformatieobject = make_objectinformatieobject_dataclass(cmis_doc, self.oio_dataclass)
-        logger.debug(f"CMIS_BACKEND: create_document_case_connection {data['registratiedatum']} successful")
+        objectinformatieobject = make_objectinformatieobject_dataclass(
+            cmis_doc, self.oio_dataclass
+        )
+        logger.debug(
+            f"CMIS_BACKEND: create_document_case_connection {data['registratiedatum']} successful"
+        )
         return objectinformatieobject
 
     def get_document_case_connections(self, filters=None):
@@ -328,7 +375,9 @@ class CMISDRCStorageBackend:
             filters = {}
 
         if "informatieobject" in filters and filters.get("informatieobject"):
-            document = self.get_document_case_connection(filters.get("informatieobject").split("/")[-1])
+            document = self.get_document_case_connection(
+                filters.get("informatieobject").split("/")[-1]
+            )
             return [document]
 
         if "object" not in filters:
@@ -337,7 +386,9 @@ class CMISDRCStorageBackend:
         documents_data = []
 
         for cmis_doc in cmis_documents.get("results"):
-            dict_document = make_objectinformatieobject_dataclass(cmis_doc, self.oio_dataclass)
+            dict_document = make_objectinformatieobject_dataclass(
+                cmis_doc, self.oio_dataclass
+            )
             if dict_document:
                 documents_data.append(dict_document)
         logger.debug("CMIS_BACKEND: get_document_case_connections successful")
@@ -359,12 +410,18 @@ class CMISDRCStorageBackend:
         """
         logger.debug(f"CMIS_BACKEND: get_document_case_connection {uuid} start")
         try:
-            cmis_document = self.cmis_client.get_cmis_document(uuid, filters={"drc:connectie__zaakurl": "NOT NULL"})
+            cmis_document = self.cmis_client.get_cmis_document(
+                uuid, filters={"drc:connectie__zaakurl": "NOT NULL"}
+            )
         except DocumentDoesNotExistError as e:
             raise self.exception_class({None: e.message}, create=True)
         else:
-            objectinformatieobject = make_objectinformatieobject_dataclass(cmis_document, self.oio_dataclass)
-            logger.debug(f"CMIS_BACKEND: get_document_case_connection {uuid} successful")
+            objectinformatieobject = make_objectinformatieobject_dataclass(
+                cmis_document, self.oio_dataclass
+            )
+            logger.debug(
+                f"CMIS_BACKEND: get_document_case_connection {uuid} successful"
+            )
             return objectinformatieobject
 
     def update_document_case_connection(self, uuid, data):
@@ -388,8 +445,12 @@ class CMISDRCStorageBackend:
         except DocumentDoesNotExistError as e:
             raise self.exception_class({None: e.message}, create=True)
         else:
-            objectinformatieobject = make_objectinformatieobject_dataclass(cmis_document, self.oio_dataclass)
-            logger.debug(f"CMIS_BACKEND: update_document_case_connection {uuid} successful")
+            objectinformatieobject = make_objectinformatieobject_dataclass(
+                cmis_document, self.oio_dataclass
+            )
+            logger.debug(
+                f"CMIS_BACKEND: update_document_case_connection {uuid} successful"
+            )
             return objectinformatieobject
 
     def delete_document_case_connection(self, uuid):
@@ -412,8 +473,12 @@ class CMISDRCStorageBackend:
         except DocumentDoesNotExistError as e:
             raise self.exception_class({None: e.message}, create=True)
         else:
-            objectinformatieobject = make_objectinformatieobject_dataclass(cmis_document, self.oio_dataclass)
-            logger.debug(f"CMIS_BACKEND: delete_document_case_connection {uuid} successful")
+            objectinformatieobject = make_objectinformatieobject_dataclass(
+                cmis_document, self.oio_dataclass
+            )
+            logger.debug(
+                f"CMIS_BACKEND: delete_document_case_connection {uuid} successful"
+            )
             return objectinformatieobject
 
     def _fix_version(self, version):

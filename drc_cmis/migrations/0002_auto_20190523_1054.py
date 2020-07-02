@@ -11,11 +11,21 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="CMISFolderLocation",
             fields=[
-                ("id", models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("location", models.CharField(default="", max_length=200)),
             ],
         ),
         migrations.AddField(
-            model_name="cmisconfig", name="locations", field=models.ManyToManyField(to="drc_cmis.CMISFolderLocation")
+            model_name="cmisconfig",
+            name="locations",
+            field=models.ManyToManyField(to="drc_cmis.CMISFolderLocation"),
         ),
     ]

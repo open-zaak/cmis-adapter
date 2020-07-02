@@ -2,11 +2,11 @@ from io import BytesIO
 
 from django.test import TestCase
 
-from tests.tests.factories import EnkelvoudigInformatieObjectFactory
-from tests.tests.mixins import DMSMixin
-
 from drc_cmis.backend import BackendException, CMISDRCStorageBackend
 from drc_cmis.client import CMISDRCClient
+
+from .factories import EnkelvoudigInformatieObjectFactory
+from .mixins import DMSMixin
 
 
 class CMISDeleteDocumentTests(DMSMixin, TestCase):
@@ -24,7 +24,9 @@ class CMISDeleteDocumentTests(DMSMixin, TestCase):
         eio = EnkelvoudigInformatieObjectFactory(identificatie="test")
         eio_dict = eio.__dict__
 
-        cmis_doc = self.cmis_client.create_document(eio.identificatie, eio_dict.copy(), BytesIO(b"some content"))
+        cmis_doc = self.cmis_client.create_document(
+            eio.identificatie, eio_dict.copy(), BytesIO(b"some content")
+        )
         self.assertIsNotNone(cmis_doc)
         self.assertFalse(cmis_doc.verwijderd)
 

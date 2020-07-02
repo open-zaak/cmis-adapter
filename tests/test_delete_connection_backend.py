@@ -2,11 +2,11 @@ from io import BytesIO
 
 from django.test import TestCase
 
-from tests.tests.factories import EnkelvoudigInformatieObjectFactory
-from tests.tests.mixins import DMSMixin
-
 from drc_cmis.backend import BackendException, CMISDRCStorageBackend
 from drc_cmis.client import CMISDRCClient
+
+from .factories import EnkelvoudigInformatieObjectFactory
+from .mixins import DMSMixin
 
 
 class CMISDeleteDocumentTests(DMSMixin, TestCase):
@@ -26,16 +26,24 @@ class CMISDeleteDocumentTests(DMSMixin, TestCase):
         self.assertIsNotNone(document)
 
         connection = self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            }
         )
-        self.assertEqual(connection.object, "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid")
+        self.assertEqual(
+            connection.object,
+            "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+        )
         self.assertIsNone(connection.object_type)
         self.assertIsNone(connection.aard_relatie)
         self.assertIsNone(connection.titel)
         self.assertIsNone(connection.beschrijving)
         self.assertIsNotNone(connection.registratiedatum)
 
-        connection = self.backend.delete_document_case_connection(document.url.split("/")[-1])
+        connection = self.backend.delete_document_case_connection(
+            document.url.split("/")[-1]
+        )
         self.assertIsNone(connection.object)
         self.assertIsNone(connection.object_type)
         self.assertIsNone(connection.aard_relatie)
@@ -49,7 +57,9 @@ class CMISDeleteDocumentTests(DMSMixin, TestCase):
         time.sleep(25)
 
         with self.assertRaises(BackendException):
-            connection = self.backend.get_document_case_connection(document.url.split("/")[-1])
+            connection = self.backend.get_document_case_connection(
+                document.url.split("/")[-1]
+            )
 
     def test_delete_connection_with_case(self):
         # Create zaaktype_folder
@@ -80,16 +90,24 @@ class CMISDeleteDocumentTests(DMSMixin, TestCase):
         self.assertIsNotNone(document)
 
         connection = self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            }
         )
-        self.assertEqual(connection.object, "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid")
+        self.assertEqual(
+            connection.object,
+            "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+        )
         self.assertIsNone(connection.object_type)
         self.assertIsNone(connection.aard_relatie)
         self.assertIsNone(connection.titel)
         self.assertIsNone(connection.beschrijving)
         self.assertIsNotNone(connection.registratiedatum)
 
-        connection = self.backend.delete_document_case_connection(document.url.split("/")[-1])
+        connection = self.backend.delete_document_case_connection(
+            document.url.split("/")[-1]
+        )
         self.assertIsNone(connection.object)
         self.assertIsNone(connection.object_type)
         self.assertIsNone(connection.aard_relatie)
@@ -103,4 +121,6 @@ class CMISDeleteDocumentTests(DMSMixin, TestCase):
         time.sleep(25)
 
         with self.assertRaises(BackendException):
-            connection = self.backend.get_document_case_connection(document.url.split("/")[-1])
+            connection = self.backend.get_document_case_connection(
+                document.url.split("/")[-1]
+            )

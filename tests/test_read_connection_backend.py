@@ -2,11 +2,11 @@ from io import BytesIO
 
 from django.test import TestCase
 
-from tests.tests.factories import EnkelvoudigInformatieObjectFactory
-from tests.tests.mixins import DMSMixin
-
 from drc_cmis.backend import BackendException, CMISDRCStorageBackend
 from drc_cmis.client import CMISDRCClient
+
+from .factories import EnkelvoudigInformatieObjectFactory
+from .mixins import DMSMixin
 
 
 class CMISReadConnectionTests(DMSMixin, TestCase):
@@ -44,11 +44,16 @@ class CMISReadConnectionTests(DMSMixin, TestCase):
         eio = EnkelvoudigInformatieObjectFactory(identificatie="test")
         eio_dict = eio.__dict__
 
-        document = self.backend.create_document(eio_dict.copy(), BytesIO(b"some content"))
+        document = self.backend.create_document(
+            eio_dict.copy(), BytesIO(b"some content")
+        )
         self.assertIsNotNone(document)
 
         self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            }
         )
 
         # Because we need to give alfresco some time to index the document there is a timeout
@@ -64,11 +69,16 @@ class CMISReadConnectionTests(DMSMixin, TestCase):
         eio = EnkelvoudigInformatieObjectFactory(identificatie="test")
         eio_dict = eio.__dict__
 
-        document = self.backend.create_document(eio_dict.copy(), BytesIO(b"some content"))
+        document = self.backend.create_document(
+            eio_dict.copy(), BytesIO(b"some content")
+        )
         self.assertIsNotNone(document)
 
         self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            }
         )
 
         # Because we need to give alfresco some time to index the document there is a timeout
@@ -111,11 +121,16 @@ class CMISReadConnectionTests(DMSMixin, TestCase):
         eio = EnkelvoudigInformatieObjectFactory(identificatie="test")
         eio_dict = eio.__dict__
 
-        document = self.backend.create_document(eio_dict.copy(), BytesIO(b"some content"))
+        document = self.backend.create_document(
+            eio_dict.copy(), BytesIO(b"some content")
+        )
         self.assertIsNotNone(document)
 
         self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            }
         )
 
         # Because we need to give alfresco some time to index the document there is a timeout
@@ -123,7 +138,9 @@ class CMISReadConnectionTests(DMSMixin, TestCase):
 
         time.sleep(25)
 
-        connection = self.backend.get_document_case_connection(document.url.split("/")[-1])
+        connection = self.backend.get_document_case_connection(
+            document.url.split("/")[-1]
+        )
         self.assertIsNotNone(connection)
 
     def test_get_document_case_connection_without_case_folder(self):
@@ -131,11 +148,16 @@ class CMISReadConnectionTests(DMSMixin, TestCase):
         eio = EnkelvoudigInformatieObjectFactory(identificatie="test")
         eio_dict = eio.__dict__
 
-        document = self.backend.create_document(eio_dict.copy(), BytesIO(b"some content"))
+        document = self.backend.create_document(
+            eio_dict.copy(), BytesIO(b"some content")
+        )
         self.assertIsNotNone(document)
 
         self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            }
         )
 
         # Because we need to give alfresco some time to index the document there is a timeout
@@ -143,7 +165,9 @@ class CMISReadConnectionTests(DMSMixin, TestCase):
 
         time.sleep(25)
 
-        connection = self.backend.get_document_case_connection(document.url.split("/")[-1])
+        connection = self.backend.get_document_case_connection(
+            document.url.split("/")[-1]
+        )
         self.assertIsNotNone(connection)
 
     def test_get_document_case_connection_without_documents(self):

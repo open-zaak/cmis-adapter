@@ -1,7 +1,4 @@
-import datetime
-
 from django.test import TestCase
-from django.utils import timezone
 
 from drc_cmis.client import CMISDRCClient, exceptions
 
@@ -59,7 +56,7 @@ class CMISOioTests(TestCase):
         }
 
         cmis_oio_1 = self.client.create_cmis_oio(data_1)
-        cmis_oio_2 = self.client.create_cmis_oio(data_2)
+        self.client.create_cmis_oio(data_2)
 
         uuid = cmis_oio_1.versionSeriesId
 

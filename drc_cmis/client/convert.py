@@ -51,24 +51,17 @@ def make_enkelvoudiginformatieobject_dataclass(cmis_doc, dataclass, skip_deleted
         # Return None if document is deleted.
         return None
 
-    path = reverse("enkelvoudiginformatieobject-detail", kwargs={"version": "1", "uuid": cmis_doc.versionSeriesId})
+    path = reverse(
+        "enkelvoudiginformatieobject-detail",
+        kwargs={"version": "1", "uuid": cmis_doc.versionSeriesId},
+    )
     url = make_absolute_uri(path)
 
     download_link = reverse(
-        "enkelvoudiginformatieobject-download", kwargs={"version": "1", "uuid": cmis_doc.versionSeriesId}
+        "enkelvoudiginformatieobject-download",
+        kwargs={"version": "1", "uuid": cmis_doc.versionSeriesId},
     )
     download_url = make_absolute_uri(download_link)
-
-    # Versie needs to be an integer. So we need to convert it to an integer.
-    versie = cmis_doc.versie
-    try:
-        int_versie = int(Decimal(versie) * 100)
-    except ValueError:
-        int_versie = 0
-    except InvalidOperation:
-        int_versie = 0
-
-    cmis_creation_date = cmis_doc.properties["cmis:creationDate"]["value"]
 
     return dataclass(
         url=url,
@@ -83,7 +76,8 @@ def make_enkelvoudiginformatieobject_dataclass(cmis_doc, dataclass, skip_deleted
         bronorganisatie=cmis_doc.bronorganisatie,
         vertrouwelijkheidaanduiding=cmis_doc.vertrouwelijkheidaanduiding,
         auteur=cmis_doc.auteur,
-        status=cmis_doc.status or "gearchiveerd",  # FIXME -> status must be saved in EIO
+        # FIXME -> status must be saved in EIO
+        status=cmis_doc.status or "gearchiveerd",
         beschrijving=cmis_doc.beschrijving or "",
         indicatie_gebruiksrecht=cmis_doc.indicatie_gebruiksrecht,
         ondertekening_soort=cmis_doc.ondertekening_soort,
@@ -95,8 +89,10 @@ def make_enkelvoudiginformatieobject_dataclass(cmis_doc, dataclass, skip_deleted
         integriteit_algoritme=cmis_doc.integriteit_algoritme,
         integriteit_waarde=cmis_doc.integriteit_waarde,
         bestandsomvang=cmis_doc.bestandsomvang,
-        begin_registratie=to_datetime(cmis_doc.begin_registratie) or to_datetime(cmis_creation_date),
-        versie=int_versie,
+        begin_registratie=to_datetime(
+            cmis_doc.begin_registratie or cmis_doc.creationDate
+        ),
+        versie=cmis_doc.versie,
         locked=bool(cmis_doc.versionSeriesCheckedOutId),
     )
 
@@ -106,10 +102,16 @@ def make_objectinformatieobject_dataclass(cmis_doc, dataclass, skip_deleted=Fals
         # Return None if document is deleted.
         return None
 
-    path = reverse("objectinformatieobject-detail", kwargs={"version": "1", "uuid": cmis_doc.versionSeriesId})
+    path = reverse(
+        "objectinformatieobject-detail",
+        kwargs={"version": "1", "uuid": cmis_doc.versionSeriesId},
+    )
     url = make_absolute_uri(path)
 
-    eio_path = reverse("enkelvoudiginformatieobject-detail", kwargs={"version": "1", "uuid": cmis_doc.versionSeriesId})
+    eio_path = reverse(
+        "enkelvoudiginformatieobject-detail",
+        kwargs={"version": "1", "uuid": cmis_doc.versionSeriesId},
+    )
     eio_url = make_absolute_uri(eio_path)
 
     return dataclass(

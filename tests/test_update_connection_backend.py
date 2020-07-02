@@ -1,11 +1,9 @@
-from io import BytesIO
-
 from django.test import TestCase
 
-from tests.tests.factories import EnkelvoudigInformatieObjectFactory
-from tests.tests.mixins import DMSMixin
-
 from drc_cmis.backend import BackendException, CMISDRCStorageBackend
+
+from .factories import EnkelvoudigInformatieObjectFactory
+from .mixins import DMSMixin
 
 
 class CMISReadConnectionTests(DMSMixin, TestCase):
@@ -27,9 +25,15 @@ class CMISReadConnectionTests(DMSMixin, TestCase):
         self.assertIsNotNone(document)
 
         connection = self.backend.create_document_case_connection(
-            {"informatieobject": document.url, "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid"}
+            {
+                "informatieobject": document.url,
+                "object": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            }
         )
-        self.assertEqual(connection.object, "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid")
+        self.assertEqual(
+            connection.object,
+            "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+        )
         self.assertIsNone(connection.object_type)
         self.assertIsNone(connection.aard_relatie)
         self.assertIsNone(connection.titel)
@@ -39,7 +43,10 @@ class CMISReadConnectionTests(DMSMixin, TestCase):
         connection_update = self.backend.update_document_case_connection(
             document.url.split("/")[-1], {"titel": "dit is een nieuwe titel"}
         )
-        self.assertEqual(connection_update.object, "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid")
+        self.assertEqual(
+            connection_update.object,
+            "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+        )
         self.assertIsNone(connection_update.object_type)
         self.assertIsNone(connection_update.aard_relatie)
         self.assertEqual(connection_update.titel, "dit is een nieuwe titel")

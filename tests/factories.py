@@ -17,8 +17,12 @@ class EnkelvoudigInformatieObjectFactory(factory.DjangoModelFactory):
     formaat = "some formaat"
     taal = "dut"
     beschrijving = factory.Faker("paragraph")
-    inhoud = factory.django.FileField(data=fake.word().encode("utf-8"), filename=fake.file_name())
-    informatieobjecttype = "https://example.com/ztc/api/v1/catalogus/1/informatieobjecttype/1"
+    inhoud = factory.django.FileField(
+        data=fake.word().encode("utf-8"), filename=fake.file_name()
+    )
+    informatieobjecttype = (
+        "https://example.com/ztc/api/v1/catalogus/1/informatieobjecttype/1"
+    )
 
     class Meta:
         model = "app.EnkelvoudigInformatieObject"

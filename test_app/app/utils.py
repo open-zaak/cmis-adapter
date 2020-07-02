@@ -1,6 +1,12 @@
 class TempDocument:
     def __init__(
-        self, url=None, auteur=None, bestandsnaam=None, creatiedatum=None, vertrouwelijkheidaanduiding=None, taal=None
+        self,
+        url=None,
+        auteur=None,
+        bestandsnaam=None,
+        creatiedatum=None,
+        vertrouwelijkheidaanduiding=None,
+        taal=None,
     ):
         self.url = url
         self.auteur = auteur
@@ -33,7 +39,9 @@ class BaseDRCStorageBackend:
     def create_document(self, enkelvoudiginformatieobject, bestand=None, link=None):
         raise NotImplementedError()
 
-    def update_document(self, enkelvoudiginformatieobject, updated_values, bestand=None, link=None):
+    def update_document(
+        self, enkelvoudiginformatieobject, updated_values, bestand=None, link=None
+    ):
         raise NotImplementedError()
 
     def remove_document(self, enkelvoudiginformatieobject):

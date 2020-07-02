@@ -41,7 +41,9 @@ class CMISDRCClient(CMISRequest):
     """
 
     documents_in_folders_query = CMISQuery("SELECT * FROM drc:document WHERE %s")
-    find_folder_by_case_url_query = CMISQuery("SELECT * FROM drc:zaakfolder WHERE drc:zaak__url='%s'")
+    find_folder_by_case_url_query = CMISQuery(
+        "SELECT * FROM drc:zaakfolder WHERE drc:zaak__url='%s'"
+    )
 
     _repo = None
     _root_folder = None
@@ -88,8 +90,12 @@ class CMISDRCClient(CMISRequest):
             mapper("identificatie", "zaaktype"): zaaktype.get("identificatie"),
         }
 
-        folder_name = f"zaaktype-{zaaktype.get('omschrijving')}-{zaaktype.get('identificatie')}"
-        cmis_folder = self._get_or_create_folder(folder_name, self._get_base_folder, properties)
+        folder_name = (
+            f"zaaktype-{zaaktype.get('omschrijving')}-{zaaktype.get('identificatie')}"
+        )
+        cmis_folder = self._get_or_create_folder(
+            folder_name, self._get_base_folder, properties
+        )
         return cmis_folder
 
     def get_or_create_zaak_folder(self, zaak, zaaktype_folder):
@@ -105,7 +111,9 @@ class CMISDRCClient(CMISRequest):
             mapper("zaaktype", "zaak"): zaak.get("zaaktype"),
             mapper("bronorganisatie", "zaak"): zaak.get("bronorganisatie"),
         }
-        cmis_folder = self._get_or_create_folder(f"zaak-{zaak.get('identificatie')}", zaaktype_folder, properties)
+        cmis_folder = self._get_or_create_folder(
+            f"zaak-{zaak.get('identificatie')}", zaaktype_folder, properties
+        )
         return cmis_folder
 
     # DRC client calls.
@@ -129,6 +137,7 @@ class CMISDRCClient(CMISRequest):
         self._check_document_exists(identification)
 
         now = datetime.now()
+        data.setdefault("versie", 1)
 
         if content is None:
             content = BytesIO()
@@ -137,12 +146,16 @@ class CMISDRCClient(CMISRequest):
         month_folder = self._get_or_create_folder(str(now.month), year_folder)
         day_folder = self._get_or_create_folder(str(now.day), month_folder)
 
-        properties = Document.build_properties(data, new=True, identification=identification)
+        properties = Document.build_properties(
+            data, new=True, identification=identification
+        )
 
         # Make sure that the content is set.
         content.seek(0)
         return day_folder.create_document(
-            name=properties.pop("cmis:name"), properties=properties, content_file=content,
+            name=properties.pop("cmis:name"),
+            properties=properties,
+            content_file=content,
         )
 
     def get_cmis_documents(self, filters=None, page=1, results_per_page=100):
@@ -187,7 +200,9 @@ class CMISDRCClient(CMISRequest):
             "results": results,
         }
 
-    def get_cmis_document(self, uuid: Optional[str], via_identification=None, filters=None):
+    def get_cmis_document(
+        self, uuid: Optional[str], via_identification=None, filters=None
+    ):
         """
         Given a cmis document instance.
 
@@ -195,9 +210,13 @@ class CMISDRCClient(CMISRequest):
         :return: :class:`AtomPubDocument` object, the latest version of this document
         """
         logger.debug("CMIS_CLIENT: get_cmis_document")
-        assert not via_identification, "Support for 'via_identification' is being dropped"
+        assert (
+            not via_identification
+        ), "Support for 'via_identification' is being dropped"
 
-        error_string = f"Document met identificatie {uuid} bestaat niet in het CMIS connection"
+        error_string = (
+            f"Document met identificatie {uuid} bestaat niet in het CMIS connection"
+        )
         does_not_exist = DocumentDoesNotExistError(error_string)
 
         # shortcut - no reason in going over the wire
@@ -207,7 +226,9 @@ class CMISDRCClient(CMISRequest):
         # this always selects the latest version
         query = CMISQuery(f"SELECT * FROM drc:document WHERE cmis:objectId = '%s' %s")
 
-        filter_string = self._build_filter(filters, filter_string="AND ", strip_end=True)
+        filter_string = self._build_filter(
+            filters, filter_string="AND ", strip_end=True
+        )
         data = {
             "cmisaction": "query",
             "statement": query(uuid, filter_string),
@@ -224,13 +245,17 @@ class CMISDRCClient(CMISRequest):
         cmis_doc = self.get_cmis_document(uuid)
 
         if not cmis_doc.isVersionSeriesCheckedOut:
-            raise DocumentNotLockedException("Document is not checked out and/or locked.")
+            raise DocumentNotLockedException(
+                "Document is not checked out and/or locked."
+            )
 
         assert not cmis_doc.isPrivateWorkingCopy, "Unexpected PWC retrieved"
         pwc = cmis_doc.get_private_working_copy()
 
         if not pwc.lock:
-            raise DocumentNotLockedException("Document is not checked out and/or locked.")
+            raise DocumentNotLockedException(
+                "Document is not checked out and/or locked."
+            )
 
         correct_lock = constant_time_compare(lock, pwc.lock)
         if not correct_lock:
@@ -240,7 +265,11 @@ class CMISDRCClient(CMISRequest):
         current_properties = cmis_doc.properties
         new_properties = Document.build_properties(data, new=False)
 
-        diff_properties = {key: value for key, value in new_properties.items() if current_properties.get(key) != value}
+        diff_properties = {
+            key: value
+            for key, value in new_properties.items()
+            if current_properties.get(key) != value
+        }
 
         try:
             pwc.update_properties(diff_properties)
@@ -322,7 +351,9 @@ class CMISDRCClient(CMISRequest):
 
         if in_zaakfolder and connection_count == 1:
             now = datetime.now()
-            year_folder = self._get_or_create_folder(str(now.year), self._get_base_folder)
+            year_folder = self._get_or_create_folder(
+                str(now.year), self._get_base_folder
+            )
             month_folder = self._get_or_create_folder(str(now.month), year_folder)
             day_folder = self._get_or_create_folder(str(now.day), month_folder)
 
@@ -392,7 +423,9 @@ class CMISDRCClient(CMISRequest):
 
         if not folder:
             now = datetime.now()
-            year_folder = self._get_or_create_folder(str(now.year), self._get_base_folder)
+            year_folder = self._get_or_create_folder(
+                str(now.year), self._get_base_folder
+            )
             month_folder = self._get_or_create_folder(str(now.month), year_folder)
             folder = self._get_or_create_folder(str(now.day), month_folder)
 
@@ -401,7 +434,9 @@ class CMISDRCClient(CMISRequest):
         properties["cmis:name"] = file_name
 
         stream = cmis_doc.get_content_stream()
-        new_doc = folder.create_document(name=file_name, properties=properties, content_file=stream,)
+        new_doc = folder.create_document(
+            name=file_name, properties=properties, content_file=stream,
+        )
 
         return new_doc
 
@@ -438,7 +473,10 @@ class CMISDRCClient(CMISRequest):
 
     def _get_folder(self, name, parent):
         logger.debug("CMIS_CLIENT: _get_folder")
-        existing = next((child for child in parent.get_children() if str(child.name) == str(name)), None)
+        existing = next(
+            (child for child in parent.get_children() if str(child.name) == str(name)),
+            None,
+        )
         if existing is not None:
             return existing
         return None
@@ -465,7 +503,9 @@ class CMISDRCClient(CMISRequest):
                         continue
                     filter_string += "( "
                     for item in value:
-                        sub_filter_string = self._build_filter({key: item}, strip_end=True)
+                        sub_filter_string = self._build_filter(
+                            {key: item}, strip_end=True
+                        )
                         filter_string += f"{sub_filter_string} OR "
                     filter_string = filter_string[:-3]
                     filter_string += " ) AND "
@@ -491,7 +531,9 @@ class CMISDRCClient(CMISRequest):
         if data.get("beschrijving") or allow_empty:
             props[mapper("beschrijving", "connection")] = data.get("beschrijving")
         if data.get("registratiedatum") or allow_empty:
-            props[mapper("registratiedatum", "connection")] = data.get("registratiedatum")
+            props[mapper("registratiedatum", "connection")] = data.get(
+                "registratiedatum"
+            )
 
         return props
 
@@ -517,7 +559,9 @@ class CMISDRCClient(CMISRequest):
         :return:
         """
 
-        gebruiksrechten_folder = self._get_or_create_folder("Gebruiksrechten", self._get_base_folder)
+        gebruiksrechten_folder = self._get_or_create_folder(
+            "Gebruiksrechten", self._get_base_folder
+        )
 
         properties = {
             mapper(key, type="gebruiksrechten"): value
@@ -525,7 +569,9 @@ class CMISDRCClient(CMISRequest):
             if mapper(key, type="gebruiksrechten")
         }
 
-        return gebruiksrechten_folder.create_gebruiksrechten(name=get_random_string(), properties=properties)
+        return gebruiksrechten_folder.create_gebruiksrechten(
+            name=get_random_string(), properties=properties
+        )
 
     def get_all_cmis_gebruiksrechten(self):
 
@@ -559,7 +605,9 @@ class CMISDRCClient(CMISRequest):
         try:
             return self.get_first_result(json_response, Gebruiksrechten)
         except GetFirstException:
-            error_string = f"Gebruiksrechten met uuid {uuid} bestaat niet in het CMIS connection"
+            error_string = (
+                f"Gebruiksrechten met uuid {uuid} bestaat niet in het CMIS connection"
+            )
             raise DocumentDoesNotExistError(error_string)
 
     def get_cmis_gebruiksrechten(self, filters):
@@ -610,10 +658,16 @@ class CMISDRCClient(CMISRequest):
 
         # TODO: Implement constraints directly in Alfresco?
         if data.get("zaak") is not None and data.get("besluit") is not None:
-            raise IntegrityError("ObjectInformatie object cannot have both Zaak and Besluit relation")
+            raise IntegrityError(
+                "ObjectInformatie object cannot have both Zaak and Besluit relation"
+            )
         elif data.get("zaak") is None and data.get("besluit") is None:
-            raise IntegrityError("ObjectInformatie object needs to have either a Zaak or Besluit relation")
-        oio_folder = self._get_or_create_folder("ObjectInformatieObject", self._get_base_folder)
+            raise IntegrityError(
+                "ObjectInformatie object needs to have either a Zaak or Besluit relation"
+            )
+        oio_folder = self._get_or_create_folder(
+            "ObjectInformatieObject", self._get_base_folder
+        )
 
         properties = {
             mapper(key, type="objectinformatieobject"): value

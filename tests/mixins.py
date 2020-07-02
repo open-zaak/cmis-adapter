@@ -1,6 +1,3 @@
-from cmislib.exceptions import ObjectNotFoundException
-
-from drc_cmis import settings
 from drc_cmis.client import CMISDRCClient
 
 

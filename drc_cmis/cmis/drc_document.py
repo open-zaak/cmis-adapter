@@ -55,7 +55,9 @@ class CMISBaseObject(CMISRequest):
             "targetFolderId": targetFolder.objectId,
         }
         logger.debug(f"From: {sourceFolder.name} To: {targetFolder.name}")
-        logger.debug(f"From: {sourceFolder.objectTypeId} To: {targetFolder.objectTypeId}")
+        logger.debug(
+            f"From: {sourceFolder.objectTypeId} To: {targetFolder.objectTypeId}"
+        )
         # invoke the URL
         json_response = self.post_request(self.root_folder_url, data=data)
         self.data = json_response
@@ -73,7 +75,10 @@ class Document(CMISBaseObject):
             convert_string = DOCUMENT_MAP.get(name)
         elif name in CONNECTION_MAP:
             convert_string = CONNECTION_MAP.get(name)
-        elif convert_string not in REVERSE_CONNECTION_MAP and convert_string not in REVERSE_DOCUMENT_MAP:
+        elif (
+            convert_string not in REVERSE_CONNECTION_MAP
+            and convert_string not in REVERSE_DOCUMENT_MAP
+        ):
             convert_string = f"cmis:{name}"
 
         if convert_string not in self.properties:
@@ -82,8 +87,13 @@ class Document(CMISBaseObject):
         return self.properties[convert_string]["value"]
 
     @classmethod
-    def build_properties(cls, data: dict, new: bool = True, identification: str = "") -> dict:
-        logger.debug("Building CMIS properties, document identification: %s", identification or "(not set)")
+    def build_properties(
+        cls, data: dict, new: bool = True, identification: str = ""
+    ) -> dict:
+        logger.debug(
+            "Building CMIS properties, document identification: %s",
+            identification or "(not set)",
+        )
 
         props = {}
         for key, value in data.items():
@@ -224,7 +234,10 @@ class Document(CMISBaseObject):
         """
         if self.isVersionSeriesCheckedOut:
             pwc = self.get_private_working_copy()
-            cancel_checkout_data = {"cmisaction": "cancelCheckout", "objectId": pwc.objectId}
+            cancel_checkout_data = {
+                "cmisaction": "cancelCheckout",
+                "objectId": pwc.objectId,
+            }
             self.post_request(self.root_folder_url, data=cancel_checkout_data)
 
         data = {"objectId": self.objectId, "cmisaction": "delete"}

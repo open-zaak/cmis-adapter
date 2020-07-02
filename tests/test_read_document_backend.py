@@ -2,10 +2,10 @@ from io import BytesIO
 
 from django.test import TestCase
 
-from tests.tests.factories import EnkelvoudigInformatieObjectFactory
-from tests.tests.mixins import DMSMixin
-
 from drc_cmis.backend import BackendException, CMISDRCStorageBackend
+
+from .factories import EnkelvoudigInformatieObjectFactory
+from .mixins import DMSMixin
 
 
 class CMISReadDocumentTests(DMSMixin, TestCase):

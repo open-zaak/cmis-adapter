@@ -15,7 +15,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="EnkelvoudigInformatieObject",
             fields=[
-                ("id", models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("uuid", models.UUIDField(default=uuid.uuid4, unique=True)),
                 ("identificatie", models.CharField(default=uuid.uuid4, max_length=40)),
                 ("bronorganisatie", models.CharField(max_length=9)),
