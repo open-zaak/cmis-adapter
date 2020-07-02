@@ -1,4 +1,7 @@
-include CONTRIBUTING.rst
-include LICENSE-MIT
-include README.rst
-include HISTORY.rst
+include *.rst
+include LICENSE
+recursive-include drc_cmis *.html
+recursive-include drc_cmis *.txt
+recursive-include drc_cmis *.po
+global-exclude __pycache__
+global-exclude *.py[co]

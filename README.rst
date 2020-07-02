@@ -1,45 +1,88 @@
-Gemma DRC CMIS
-========================================================
+===========================
+Documenten API CMIS adapter
+===========================
 
-.. note:: This package is not ment to be run seperate from gemma-documentregistratiecomponent.
+:Version: 0.3.4
+:Source: https://github.com/GemeenteUtrecht/gemma-drc-cmis
+:Keywords: CMIS, Documenten API, VNG, Common Ground
+:PythonVersion: 3.7
 
-.. image:: https://img.shields.io/pypi/v/drc-cmis.svg?style=for-the-badge
-           :alt: PyPi
-           :target: https://pypi.org/project/drc-cmis/
-.. image:: https://img.shields.io/travis/GemeenteUtrecht/gemma-drc-cmis.svg?style=for-the-badge
-           :alt: Travis
-           :target: https://travis-ci.org/GemeenteUtrecht/gemma-drc-cmis
-.. image:: https://img.shields.io/codecov/c/gh/GemeenteUtrecht/gemma-drc-cmis.svg?style=for-the-badge
-           :alt: Codecov
-           :target: https://codecov.io/gh/GemeenteUtrecht/gemma-drc-cmis
+|build-status| |coverage| |black|
 
-.. contents:: **Table of Contents**
-    :backlinks: none
+|python-versions| |django-versions| |pypi-version|
+
+An adapter to manage `Documenten API`_ resources in a CMIS backend.
+
+.. contents::
+
+.. section-numbering::
+
+Features
+========
+
+* CMIS 1.1 browser binding
+* Store documents and metadata in a CMIS repository
+* Supports reading and writing of documents
+* Supports checking out/in of documents
+* Supports custom data-model
 
 Installation
+============
+
+Requirements
 ------------
 
-Gemma DRC CMIS is distributed on `PyPI <https://pypi.org>`_ as a universal
-wheel and is available on Linux/macOS and Windows and supports
-Python 2.7/3.5+ and PyPy.
+* Python 3.7 or above
+* setuptools 30.3.0 or above
+* Django 2.2 or newer
+
+Install
+-------
 
 .. code-block:: bash
 
-    $ pip install gemma-drc-cmis
+    $ pip install drc-cmis
 
 
 Add to installed apps
 
-.. code-block:: bash
+.. code-block:: python
 
     INSTALLED_APPS = [
         ...
-        'drc_cmis',
+        "drc_cmis",
         ...
     ]
 
-License
--------
 
-Gemma DRC CMIS is distributed under the terms of the
-`MIT License <https://choosealicense.com/licenses/mit>`_.
+And add the settings to enable it:
+
+.. code-block:: python
+
+    CMIS_ENABLED = True
+    CMIS_DELETE_IS_OBLITERATE = True
+    CMIS_MAPPER_FILE = /path/to/cmis_mapper.json
+
+Usage
+-----
+
+.. todo:: provide proper documentation
+
+.. |build-status| image:: https://travis-ci.org/GemeenteUtrecht/gemma-drc-cmis.svg?branch=master
+    :target: https://travis-ci.org/GemeenteUtrecht/gemma-drc-cmis
+
+.. |coverage| image:: https://codecov.io/gh/GemeenteUtrecht/gemma-drc-cmis/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/GemeenteUtrecht/gemma-drc-cmis
+    :alt: Coverage status
+
+.. |black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
+    :target: https://github.com/psf/black
+
+.. |python-versions| image:: https://img.shields.io/pypi/pyversions/drc-cmis.svg
+
+.. |django-versions| image:: https://img.shields.io/pypi/djversions/drc-cmis.svg
+
+.. |pypi-version| image:: https://img.shields.io/pypi/v/drc-cmis.svg
+    :target: https://pypi.org/project/drc-cmis/
+
+.. _Documenten API: https://vng-realisatie.github.io/gemma-zaken/standaard/documenten/index

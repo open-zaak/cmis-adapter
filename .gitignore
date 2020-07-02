@@ -46,6 +46,7 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+reports/
 
 # Translations
 *.mo
@@ -100,21 +101,19 @@ ENV/
 
 # mypy
 .mypy_cache/
-uploads/
-alfresco/alfresco-community-installer-201707-linux-x64.bin
-reports/junit.xml
+
+# PyCharm
+.idea/
 
 # Project specific files
 reports/
 alfresco2/
 .vscode/
-alfresco/volumes/data/
-alfresco/volumes/logs/
+alfresco/volumes/
 tests/database.db
 XDG_CACHE_HOME/
 DEV.md
 pip-wheel-metadata/
 export_mapper.py
-
-# PyCharm
-.idea/
+uploads/
+alfresco/alfresco-community-installer-201707-linux-x64.bin
