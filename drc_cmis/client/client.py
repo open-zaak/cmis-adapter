@@ -224,7 +224,7 @@ class CMISDRCClient(CMISRequest):
             raise does_not_exist
 
         # this always selects the latest version
-        query = CMISQuery(f"SELECT * FROM drc:document WHERE cmis:objectId = '%s' %s")
+        query = CMISQuery("SELECT * FROM drc:document WHERE cmis:objectId = '%s' %s")
 
         filter_string = self._build_filter(
             filters, filter_string="AND ", strip_end=True
@@ -387,34 +387,42 @@ class CMISDRCClient(CMISRequest):
         So we create a new document with the same values.
         """
         logger.debug("CMIS_CLIENT: copy_document")
-        properties = {}
+
+        attributes = [
+            "auteur",
+            "beschrijving",
+            "bestandsnaam",
+            "bronorganisatie",
+            "creatiedatum",
+            "formaat",
+            "identificatie",
+            "indicatie_gebruiksrecht",
+            "informatieobjecttype",
+            "integriteit_algoritme",
+            "integriteit_datum",
+            "integriteit_waarde",
+            "link",
+            "ondertekening_datum",
+            "ondertekening_soort",
+            "ontvangstdatum",
+            "status",
+            "taal",
+            "vertrouwelijkheidaanduiding",
+            "verwijderd",
+            "verzenddatum",
+        ]
+
+        # copy the properties from the source document
+        properties = {
+            mapper(attribute, type="document"): getattr(cmis_doc, attribute)
+            for attribute in attributes
+        }
 
         properties.update(
             **{
                 "cmis:objectTypeId": cmis_doc.objectTypeId,
-                "drc:document__auteur": cmis_doc.auteur,
-                "drc:document__beschrijving": cmis_doc.beschrijving,
-                "drc:document__bestandsnaam": cmis_doc.bestandsnaam,
-                "drc:document__bronorganisatie": cmis_doc.bronorganisatie,
-                "drc:document__creatiedatum": cmis_doc.creatiedatum,
-                "drc:document__formaat": cmis_doc.formaat,
-                "drc:document__identificatie": cmis_doc.identificatie,
-                "drc:document__indicatiegebruiksrecht": cmis_doc.indicatiegebruiksrecht,
-                "drc:document__informatieobjecttype": cmis_doc.informatieobjecttype,
-                "drc:document__integriteitalgoritme": cmis_doc.integriteitalgoritme,
-                "drc:document__integriteitdatum": cmis_doc.integriteitdatum,
-                "drc:document__integriteitwaarde": cmis_doc.integriteitwaarde,
-                "drc:document__link": cmis_doc.link,
-                "drc:document__ondertekeningdatum": cmis_doc.ondertekeningdatum,
-                "drc:document__ondertekeningsoort": cmis_doc.ondertekeningsoort,
-                "drc:document__ontvangstdatum": cmis_doc.ontvangstdatum,
-                "drc:document__status": cmis_doc.status,
-                "drc:document__taal": cmis_doc.taal,
-                "drc:document__titel": f"{cmis_doc.titel} - copy",
-                "drc:document__vertrouwelijkaanduiding": cmis_doc.vertrouwelijkaanduiding,
-                "drc:document__verwijderd": cmis_doc.verwijderd,
-                "drc:document__verzenddatum": cmis_doc.verzenddatum,
-                "drc:kopie_van": cmis_doc.id,  # Keep tack of where this is copied from.
+                mapper("titel", type="document"): f"{cmis_doc.titel} - copy",
+                "drc:kopie_van": cmis_doc.uuid,  # Keep tack of where this is copied from.
             }
         )
 

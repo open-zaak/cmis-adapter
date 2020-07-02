@@ -34,7 +34,10 @@ class Migration(migrations.Migration):
             name="client_url",
             field=models.URLField(
                 default="http://localhost:8082/alfresco/api/-default-/public/cmis/versions/1.1/browser",
-                help_text="API URL for DMS. For example, for alfresco this can be http://domain_name:port_number/alfresco/api/-default-/public/cmis/versions/1.1/browser",
+                help_text=(
+                    "API URL for DMS. For example, for alfresco this can be http://domain_name:port_number/"
+                    "alfresco/api/-default-/public/cmis/versions/1.1/browser"
+                ),
             ),
         ),
         migrations.AlterField(
