@@ -28,10 +28,7 @@ class CMISBaseObject(CMISRequest):
 
     def reload(self):
         logger.debug("CMIS: DRC_DOCUMENT: reload")
-        params = {
-            "objectId": self.objectId,
-            "cmisselector": "object",
-        }
+        params = {"objectId": self.objectId, "cmisselector": "object"}
 
         json_response = self.get_request(self.root_folder_url, params=params)
         self.data = json_response
@@ -39,10 +36,7 @@ class CMISBaseObject(CMISRequest):
 
     def get_object_parents(self):
         logger.debug("CMIS: DRC_DOCUMENT: get_object_parents")
-        params = {
-            "objectId": self.objectId,
-            "cmisselector": "parents",
-        }
+        params = {"objectId": self.objectId, "cmisselector": "parents"}
 
         json_response = self.get_request(self.root_folder_url, params=params)
         return self.get_all_objects(json_response, Folder)
@@ -130,10 +124,7 @@ class Document(CMISBaseObject):
 
     def update_properties(self, properties):
         logger.debug("CMIS: DRC_DOCUMENT: update_properties")
-        data = {
-            "objectId": self.objectId,
-            "cmisaction": "update",
-        }
+        data = {"objectId": self.objectId, "cmisaction": "update"}
         prop_count = 0
         for prop_key, prop_value in properties.items():
             # Skip property because update is not allowed
@@ -182,10 +173,7 @@ class Document(CMISBaseObject):
 
     def set_content_stream(self, content_file):
         logger.debug("CMIS: DRC_DOCUMENT: set_content_stream")
-        data = {
-            "objectId": self.objectId,
-            "cmisaction": "setContent",
-        }
+        data = {"objectId": self.objectId, "cmisaction": "setContent"}
 
         mimetype = None
         # need to determine the mime type
@@ -202,10 +190,7 @@ class Document(CMISBaseObject):
 
     def get_content_stream(self) -> BytesIO:
         logger.debug("CMIS: DRC_DOCUMENT: get_content_stream")
-        params = {
-            "objectId": self.objectId,
-            "cmisaction": "content",
-        }
+        params = {"objectId": self.objectId, "cmisaction": "content"}
         file_content = self.get_request(self.root_folder_url, params=params)
         return BytesIO(file_content)
 

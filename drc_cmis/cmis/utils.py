@@ -1,6 +1,7 @@
 import logging
+from decimal import Decimal
 from json.decoder import JSONDecodeError
-from typing import BinaryIO, Optional
+from typing import Optional, List
 from xml.dom import minidom
 
 import requests
@@ -169,7 +170,7 @@ class CMISRequest:
         return objects
 
 
-def extract_properties_from_xml(xml_data, cmis_action=None):
+def extract_properties_from_xml(xml_data, cmis_action=None) -> List[dict]:
     """
     Function adapted from cmislib. It parses a XML response and extracts properties to a dictionary.
     The dictionary has format
@@ -280,10 +281,57 @@ def extract_root_folder_id_from_xml(xml_data: str) -> str:
     return folder_id_node.firstChild.nodeValue
 
 
+def extract_folders_from_xml(xml_data: str) -> List[dict]:
+    """Extract all the folders returned by a CMIS SQL query
+
+    The results are formatted as a list of dictionaries, where each dictionary
+    contains the properties of a folder.
+
+    :param xml_data: string, the xml soap envelope returned after a cmis SQL request
+    :return: List of dict, dictionaries containing the properties of the documents.
+    """
+
+    parsed_xml = minidom.parseString(xml_data)
+
+    folders = []
+
+    for response_node in parsed_xml.getElementsByTagName(f"queryResponse"):
+        for objects_node in response_node.childNodes:
+            for object_node in objects_node.childNodes:
+                folder = {}
+                for property_node in object_node.childNodes:
+                    for child_node in property_node.childNodes:
+                        try:
+                            property_name = child_node.attributes[
+                                "propertyDefinitionId"
+                            ].value
+                        except KeyError:
+                            continue
+
+                        node_values = child_node.getElementsByTagName("ns2:value")
+                        if len(node_values) == 0:
+                            folder[property_name] = {"value": None}
+                        else:
+                            folder[property_name] = {
+                                "value": node_values[0].childNodes[0].data
+                            }
+                folders.append({"properties": folder})
+
+    return folders
+
+
+def extract_num_items(xml_data: str) -> int:
+    """Extract the number of items in the SOAP XML returned by a query"""
+    parsed_xml = minidom.parseString(xml_data)
+    folder_id_node = parsed_xml.getElementsByTagName("numItems")[0]
+    return int(folder_id_node.firstChild.nodeValue)
+
+
 def get_xml_doc(
     cmis_action: str,
     repository_id: Optional[str] = None,
     properties: Optional[dict] = None,
+    statement: Optional[str] = None,
     object_id: Optional[str] = None,
     folder_id: Optional[str] = None,
     content_id: Optional[str] = None,
@@ -375,6 +423,13 @@ def get_xml_doc(
             properties_element.appendChild(property_element)
         action_element.appendChild(properties_element)
 
+    # For query requests, there is a SQL statement
+    if statement is not None:
+        query_element = xml_doc.createElement("ns:statement")
+        query_text = xml_doc.createTextNode(statement)
+        query_element.appendChild(query_text)
+        action_element.appendChild(query_element)
+
     body_element.appendChild(action_element)
 
     # Folder ID
@@ -404,9 +459,7 @@ def get_xml_doc(
         include_element.setAttribute(
             "xmlns:inc", "http://www.w3.org/2004/08/xop/include"
         )
-        include_element.setAttribute(
-            "href", f"cid:{content_id}"
-        )
+        include_element.setAttribute("href", f"cid:{content_id}")
         stream_element.appendChild(include_element)
         content_element.appendChild(stream_element)
 
@@ -422,6 +475,43 @@ def extract_xml_from_soap(soap_response):
     end_xml = soap_response.find("</soap:Envelope>") + len("</soap:Envelope>")
 
     return soap_response[begin_xml:end_xml]
+
+
+def build_query_filters(filters, filter_string="", strip_end=False):
+    """Build filters for SQL query"""
+    from client.mapper import mapper
+
+    if filters:
+        for key, value in filters.items():
+            if mapper(key):
+                key = mapper(key)
+            elif mapper(key, type="connection"):
+                key = mapper(key, type="connection")
+            elif mapper(key, type="gebruiksrechten"):
+                key = mapper(key, type="gebruiksrechten")
+            elif mapper(key, type="objectinformatieobject"):
+                key = mapper(key, type="objectinformatieobject")
+
+            if value and value in ["NULL", "NOT NULL"]:
+                filter_string += f"{key} IS {value} AND "
+            elif isinstance(value, Decimal):
+                filter_string += f"{key} = {value} AND "
+            elif isinstance(value, list):
+                if len(value) == 0:
+                    continue
+                filter_string += "( "
+                for item in value:
+                    sub_filter_string = build_query_filters({key: item}, strip_end=True)
+                    filter_string += f"{sub_filter_string} OR "
+                filter_string = filter_string[:-3]
+                filter_string += " ) AND "
+            elif value:
+                filter_string += f"{key} = '{value}' AND "
+
+    if strip_end and filter_string[-4:] == "AND ":
+        filter_string = filter_string[:-4]
+
+    return filter_string
 
 
 property_name_type_map = {

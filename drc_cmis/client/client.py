@@ -1,5 +1,4 @@
 import logging
-import uuid
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -9,7 +8,6 @@ from uuid import UUID
 from django.db.utils import IntegrityError
 from django.utils.crypto import constant_time_compare
 
-from cmislib.domain import CmisId
 from cmislib.exceptions import UpdateConflictException
 
 from drc_cmis.cmis.drc_document import (
@@ -18,14 +16,7 @@ from drc_cmis.cmis.drc_document import (
     Gebruiksrechten,
     ObjectInformatieObject,
 )
-from drc_cmis.cmis.utils import (
-    CMISRequest,
-    extract_properties_from_xml,
-    extract_repository_id_from_xml,
-    extract_root_folder_id_from_xml,
-    extract_xml_from_soap,
-    get_xml_doc,
-)
+from drc_cmis.cmis.utils import CMISRequest
 
 from .exceptions import (
     DocumentConflictException,
@@ -54,14 +45,9 @@ class CMISDRCClient(CMISRequest):
         "SELECT * FROM drc:zaakfolder WHERE drc:zaak__url='%s'"
     )
 
-    test_root_url = "http://localhost:8082/alfresco/cmisws"
-
     _repo = None
     _root_folder = None
     _base_folder = None
-
-    _main_repo_id = None
-    _root_folder_id = None
 
     @property
     def _get_base_folder(self):
@@ -76,92 +62,6 @@ class CMISDRCClient(CMISRequest):
                 folder = Folder({})
                 self._base_folder = folder.create_folder(name=self.base_folder)
         return self._base_folder
-
-    @property
-    def main_repo_id(self) -> str:
-        """
-        Retrieves the ID of the main repository
-        """
-        logger.debug("CMIS_CLIENT: get main repository ID")
-
-        if not self._main_repo_id:
-            post_url = "http://localhost:8082/alfresco/cmisws/RepositoryService"
-
-            boundary = "------=_Part_52_1132425564.1594208078802"
-            headers = {
-                "Content-Type": 'multipart/related; type="application/xop+xml"; start="<rootpart@soapui.org>"; '
-                'start-info="application/soap+xml"; boundary="----=_Part_52_1132425564.1594208078802"',
-                "SOAPAction": "",
-                "MIME-Version": "1.0",
-            }
-
-            body_headers = {
-                "Content-Type": 'application/xop+xml; charset=UTF-8; type="application/soap+xml"',
-                "Content-Transfer-Encoding": "8bit",
-                "Content-ID": "<rootpart@soapui.org>",
-            }
-
-            xml_body = get_xml_doc(cmis_action="getRepositories")
-
-            xml_part_header = ""
-            for key, value in body_headers.items():
-                xml_part_header += f"{key}: {value}\n"
-
-            body = (
-                f"\n{boundary}\n{xml_part_header}\n{xml_body.toxml()}\n\n{boundary}--\n"
-            )
-
-            soap_response = self.post_request(
-                post_url, data=body, headers=headers, files=[]
-            )
-
-            xml_response = extract_xml_from_soap(soap_response)
-            self._main_repo_id = extract_repository_id_from_xml(xml_response)
-
-        return self._main_repo_id
-
-    @property
-    def root_folder_id(self) -> str:
-        """
-        Retrieves the ID of the root folder in the main repository
-        """
-        if not self._root_folder_id:
-            post_url = "http://localhost:8082/alfresco/cmisws/RepositoryService"
-
-            boundary = "------=_Part_52_1132425564.1594208078802"
-            headers = {
-                "Content-Type": 'multipart/related; type="application/xop+xml"; start="<rootpart@soapui.org>"; '
-                'start-info="application/soap+xml"; boundary="----=_Part_52_1132425564.1594208078802"',
-                "SOAPAction": "",
-                "MIME-Version": "1.0",
-            }
-
-            body_headers = {
-                "Content-Type": 'application/xop+xml; charset=UTF-8; type="application/soap+xml"',
-                "Content-Transfer-Encoding": "8bit",
-                "Content-ID": "<rootpart@soapui.org>",
-            }
-
-            xml_body = get_xml_doc(
-                cmis_action="getRepositoryInfo", repository_id=self.main_repo_id
-            )
-
-            xml_part_header = ""
-            for key, value in body_headers.items():
-                xml_part_header += f"{key}: {value}\n"
-
-            body = (
-                f"\n{boundary}\n{xml_part_header}\n{xml_body.toxml()}\n\n{boundary}--\n"
-            )
-
-            soap_response = self.post_request(
-                post_url, data=body, headers=headers, files=[]
-            )
-
-            xml_response = extract_xml_from_soap(soap_response)
-            self._root_folder_id = extract_root_folder_id_from_xml(xml_response)
-
-        return self._root_folder_id
 
     # generic querying
     def query(self, return_type, lhs: List[str], rhs: List[str]):
@@ -254,147 +154,6 @@ class CMISDRCClient(CMISRequest):
             properties=properties,
             content_file=content,
         )
-
-    def create_document_with_soap(self, identification: str, data: dict, content: Optional[BytesIO] = None) -> Document:
-
-        new_folder = self.create_folder_with_soap(
-            f"TestSoapFolder-{get_random_string()}"
-        )
-
-        properties = Document.build_properties(identification=identification, data=data)
-
-        post_url = "http://localhost:8082/alfresco/cmisws/ObjectService"
-
-        properties["cmis:name"] = "TestSoapDocument"
-        properties["cmis:objectTypeId"] = CmisId("D:drc:document")
-
-        boundary = "------=_Part_52_1132425564.1594208078802"
-        headers = {
-            "Content-Type": 'multipart/related; type="application/xop+xml"; start="<rootpart@soapui.org>"; '
-            'start-info="application/soap+xml"; boundary="----=_Part_52_1132425564.1594208078802"',
-            "SOAPAction": "",
-            "MIME-Version": "1.0",
-        }
-
-        body_headers = {
-            "Content-Type": 'application/xop+xml; charset=UTF-8; type="application/soap+xml"',
-            "Content-Transfer-Encoding": "8bit",
-            "Content-ID": "<rootpart@soapui.org>",
-        }
-
-        xml_part_header = ""
-        for key, value in body_headers.items():
-            xml_part_header += f"{key}: {value}\n"
-
-        if content is None:
-            xml_document = get_xml_doc(
-                repository_id=self.main_repo_id,
-                folder_id=new_folder.properties.get("objectId")["value"],
-                properties=properties,
-                cmis_action="createDocument",
-            )
-
-            body = (
-                f"\n{boundary}\n{xml_part_header}\n{xml_document.toxml()}\n\n{boundary}--\n"
-            )
-        else:
-            content_id = str(uuid.uuid4())  # Content ID
-
-            xml_document = get_xml_doc(
-                repository_id=self.main_repo_id,
-                folder_id=new_folder.properties.get("objectId")["value"],
-                properties=properties,
-                cmis_action="createDocument",
-                content_id=content_id,
-            )
-
-            file_attachment_headers = {
-              "Content-Type": "application/octet-stream",
-              "Content-Transfer-Encoding": "binary",
-              "Content-ID": f"<{content_id}>",
-            }
-
-            xml_attachment_header = ""
-            for key, value in file_attachment_headers.items():
-                xml_attachment_header += f"{key}: {value}\n"
-
-            test_content = open("/home/silvia/Documents/validsign/test_word_doc.pdf", "rb")
-
-            body = (
-                f"\n{boundary}\n{xml_part_header}\n{xml_document.toxml()}\n\n{boundary}\n{xml_attachment_header}\n\n{test_content.read()}\n\n{boundary}--\n"
-            )
-
-            test_content.close()
-
-        soap_response = self.post_request(
-            post_url, data=body, headers=headers, files=[]
-        )
-
-        xml_response = extract_xml_from_soap(soap_response)
-        extracted_data = extract_properties_from_xml(xml_response, "createDocument")[0]
-
-        document_id = extracted_data["properties"]["objectId"]["value"]
-
-        xml_to_get_document = get_xml_doc(
-            repository_id=self.main_repo_id,
-            object_id=document_id,
-            cmis_action="getObject",
-        )
-
-        body = f"\n{boundary}\n{xml_part_header}\n{xml_to_get_document.toxml()}\n\n{boundary}--\n"
-
-        soap_response = self.post_request(
-            post_url, data=body, headers=headers, files=[]
-        )
-        xml_response = extract_xml_from_soap(soap_response)
-        extracted_data = extract_properties_from_xml(xml_response, "getObject")[0]
-
-        new_document = Document(extracted_data)
-
-        return new_document
-
-    def create_folder_with_soap(self, name):
-        post_url = "http://localhost:8082/alfresco/cmisws/ObjectService"
-
-        object_type_id = CmisId("cmis:folder")
-
-        properties = {"cmis:objectTypeId": object_type_id, "cmis:name": name}
-
-        boundary = "------=_Part_52_1132425564.1594208078802"
-        headers = {
-            "Content-Type": 'multipart/related; type="application/xop+xml"; start="<rootpart@soapui.org>"; '
-            'start-info="application/soap+xml"; boundary="----=_Part_52_1132425564.1594208078802"',
-            "SOAPAction": "",
-            "MIME-Version": "1.0",
-        }
-
-        body_headers = {
-            "Content-Type": 'application/xop+xml; charset=UTF-8; type="application/soap+xml"',
-            "Content-Transfer-Encoding": "8bit",
-            "Content-ID": "<rootpart@soapui.org>",
-        }
-
-        xml_folder = get_xml_doc(
-            repository_id=self.main_repo_id,
-            folder_id=self.root_folder_id,
-            properties=properties,
-            cmis_action="createFolder",
-        )
-
-        xml_part_header = ""
-        for key, value in body_headers.items():
-            xml_part_header += f"{key}: {value}\n"
-
-        body = (
-            f"\n{boundary}\n{xml_part_header}\n{xml_folder.toxml()}\n\n{boundary}--\n"
-        )
-
-        soap_response = self.post_request(
-            post_url, data=body, headers=headers, files=[]
-        )
-        xml_response = extract_xml_from_soap(soap_response)
-        extracted_data = extract_properties_from_xml(xml_response, "createFolder")[0]
-        return Folder(extracted_data)
 
     def get_cmis_documents(self, filters=None, page=1, results_per_page=100):
         """
