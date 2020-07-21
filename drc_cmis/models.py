@@ -10,12 +10,12 @@ class CMISConfig(SingletonModel):
         "http://domain_name:port_number/alfresco/api/-default-/public/cmis/versions/1.1/browser",
     )
     client_user = models.CharField(
-        max_length=200, default="admin", help_text="Username for logging into DMS",
+        max_length=200, default="admin", help_text="Username for logging into DMS"
     )
     client_password = models.CharField(
         max_length=200, default="admin", help_text="Password for logging into DMS"
     )
-    base_folder = models.CharField(
+    base_folder_name = models.CharField(
         max_length=200,
         default="DRC",
         help_text="Name of the DMS folder in which the documents will be stored.",
