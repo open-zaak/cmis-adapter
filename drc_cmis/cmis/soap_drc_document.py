@@ -1,24 +1,26 @@
 import logging
+from io import BytesIO
 from typing import List
 
-from cmislib.domain import CmisId
-
-from client.mapper import (
-    DOCUMENT_MAP,
-    CONNECTION_MAP,
-    REVERSE_CONNECTION_MAP,
-    REVERSE_DOCUMENT_MAP,
-    mapper,
-)
 from client.query import CMISQuery
 from client.utils import get_random_string
 from cmis.soap_request import SOAPCMISRequest
 from cmis.utils import (
-    get_xml_doc,
-    extract_xml_from_soap,
-    extract_properties_from_xml,
+    extract_content,
+    extract_content_stream_properties_from_xml,
     extract_folders_from_xml,
     extract_num_items,
+    extract_properties_from_xml,
+    extract_xml_from_soap,
+    get_xml_doc,
+)
+
+from drc_cmis.client.mapper import (
+    CONNECTION_MAP,
+    DOCUMENT_MAP,
+    REVERSE_CONNECTION_MAP,
+    REVERSE_DOCUMENT_MAP,
+    mapper,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,11 @@ class Document(CMISBaseObject):
     object_type_id = f"D:{table}"
 
     def __getattr__(self, name: str):
+        try:
+            return super(SOAPCMISRequest, self).__getattribute__(name)
+        except AttributeError:
+            pass
+
         convert_string = f"drc:{name}"
         if name in DOCUMENT_MAP:
             convert_string = DOCUMENT_MAP.get(name)
@@ -121,6 +128,20 @@ class Document(CMISBaseObject):
         ]
         # TODO this may need re-fetching the updated document
         return type(self)(extracted_data)
+
+    def get_content_stream(self) -> BytesIO:
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            object_id=self.objectId,
+            cmis_action="getContentStream",
+        )
+
+        soap_response = self.request(
+            "ObjectService", soap_envelope=soap_envelope.toxml()
+        )
+
+        # FIXME find a better way to do this
+        return extract_content(soap_response)
 
 
 class Folder(CMISBaseObject):

@@ -1,32 +1,33 @@
 import datetime
+import uuid
 from io import BytesIO
-from typing import Optional, Union
+from typing import List, Optional, Union
 from uuid import UUID
 
-from cmislib.domain import CmisId
-from cmislib.exceptions import UpdateConflictException
 from django.utils.crypto import constant_time_compare
 
 from client.exceptions import (
-    DocumentExistsError,
-    DocumentDoesNotExistError,
-    DocumentNotLockedException,
-    DocumentLockConflictException,
     DocumentConflictException,
+    DocumentDoesNotExistError,
+    DocumentExistsError,
+    DocumentLockConflictException,
+    DocumentNotLockedException,
 )
 from client.query import CMISQuery
-from cmis.soap_drc_document import Folder, Document
+from cmis.soap_drc_document import Document, Folder
 from cmis.soap_request import SOAPCMISRequest
 from cmis.utils import (
-    get_xml_doc,
-    extract_xml_from_soap,
+    build_query_filters,
+    extract_folders_from_xml,
+    extract_num_items,
     extract_properties_from_xml,
     extract_repository_id_from_xml,
     extract_root_folder_id_from_xml,
-    extract_num_items,
-    build_query_filters,
-    extract_folders_from_xml,
+    extract_xml_from_soap,
+    get_xml_doc,
 )
+from cmislib.domain import CmisId
+from cmislib.exceptions import UpdateConflictException
 
 
 class SOAPCMISClient(SOAPCMISRequest):
@@ -74,6 +75,22 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         return self._base_folder
 
+    def query(self, return_type, lhs: List[str], rhs: List[str]) -> List["return_type"]:
+        table = return_type.table
+        where = (" WHERE " + " AND ".join(lhs)) if lhs else ""
+        query = CMISQuery("SELECT * FROM %s%s" % (table, where))
+
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id, statement=query(*rhs), cmis_action="query"
+        )
+
+        soap_response = self.request(
+            "DiscoveryService", soap_envelope=soap_envelope.toxml()
+        )
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_properties_from_xml(xml_response, "query")
+        return [return_type(cmis_object) for cmis_object in extracted_data]
+
     def get_or_create_folder(self, name: str, parent: Folder) -> Folder:
         """Get or create a folder 'name/' in a folder with cmis:objectId `parent_id`
 
@@ -83,11 +100,11 @@ class SOAPCMISClient(SOAPCMISRequest):
         """
 
         children_folders = parent.get_children_folders()
-        for foldren in children_folders:
-            if foldren.name == name:
-                return foldren
+        for folder in children_folders:
+            if folder.name == name:
+                return folder
 
-        # Create new foldren, as it doesn't exist yet
+        # Create new folder, as it doesn't exist yet
         return self.create_folder(name, parent.objectId)
 
     def create_folder(self, name: str, parent_id: str) -> Folder:
@@ -126,12 +143,54 @@ class SOAPCMISClient(SOAPCMISRequest):
         now = datetime.datetime.now()
         data.setdefault("versie", 1)
 
+        content_id = str(uuid.uuid4())
         if content is None:
             content = BytesIO()
 
         year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
         month_folder = self.get_or_create_folder(str(now.month), year_folder)
         day_folder = self.get_or_create_folder(str(now.day), month_folder)
+
+        properties = Document.build_properties(
+            data, new=True, identification=identification
+        )
+
+        # TODO Add content of document
+
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            folder_id=day_folder.objectId,
+            properties=properties,
+            cmis_action="createDocument",
+            content_id=content_id,
+        )
+
+        soap_response = self.request(
+            "ObjectService",
+            soap_envelope=soap_envelope.toxml(),
+            attachments=[(content_id, content)],
+        )
+
+        xml_response = extract_xml_from_soap(soap_response)
+        # Creating the document only returns its ID
+        extracted_data = extract_properties_from_xml(xml_response, "createDocument")[0]
+        new_document_id = extracted_data["properties"]["objectId"]["value"]
+
+        # Request all the properties of the newly created document
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            object_id=new_document_id,
+            cmis_action="getObject",
+        )
+
+        soap_response = self.request(
+            "ObjectService", soap_envelope=soap_envelope.toxml()
+        )
+
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_properties_from_xml(xml_response, "getObject")[0]
+
+        return Document(extracted_data)
 
     def update_document(
         self, uuid: str, lock: str, data: dict, content: Optional[BytesIO] = None
@@ -206,7 +265,7 @@ class SOAPCMISClient(SOAPCMISRequest):
             "DiscoveryService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
-
+        # TODO check number of Docs returned and raise an error if there are more than 1
         extracted_data = extract_properties_from_xml(xml_response, "query")[0]
         return Document(extracted_data)
 

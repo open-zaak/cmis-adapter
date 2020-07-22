@@ -1,7 +1,9 @@
 import logging
+import re
 from decimal import Decimal
+from io import BytesIO
 from json.decoder import JSONDecodeError
-from typing import Optional, List
+from typing import List, Optional
 from xml.dom import minidom
 
 import requests
@@ -170,6 +172,7 @@ class CMISRequest:
         return objects
 
 
+# TODO clean up this function from unneeded functionality
 def extract_properties_from_xml(xml_data, cmis_action=None) -> List[dict]:
     """
     Function adapted from cmislib. It parses a XML response and extracts properties to a dictionary.
@@ -189,80 +192,38 @@ def extract_properties_from_xml(xml_data, cmis_action=None) -> List[dict]:
 
     all_objects = []
 
-    if cmis_action is None:
-        for propertiesElement in parsed_xml.getElementsByTagNameNS(
-            CMIS_NS, "properties"
-        ):
-            extracted_properties = {}
-            for node in [
-                e
-                for e in propertiesElement.childNodes
-                if e.nodeType == e.ELEMENT_NODE and e.namespaceURI == CMIS_NS
-            ]:
+    extracted_properties = {}
 
-                propertyName = node.attributes["propertyDefinitionId"].value
-                if (
-                    node.childNodes
-                    and node.getElementsByTagNameNS(CMIS_NS, "value")[0]
-                    and node.getElementsByTagNameNS(CMIS_NS, "value")[0].childNodes
-                ):
-                    valNodeList = node.getElementsByTagNameNS(CMIS_NS, "value")
-                    if len(valNodeList) == 1:
-                        propertyValue = parsePropValue(
-                            valNodeList[0].childNodes[0].data, node.localName
-                        )
-                    else:
-                        propertyValue = []
-                        for valNode in valNodeList:
-                            propertyValue.append(
-                                parsePropValue(
-                                    valNode.childNodes[0].data, node.localName
-                                )
-                            )
-                else:
-                    propertyValue = None
-                extracted_properties[propertyName] = {"value": propertyValue}
+    # When creating documents and folders this extracts the objectId
+    for node in parsed_xml.getElementsByTagName(f"{cmis_action}Response"):
+        for child_node in node.childNodes:
+            node_name = child_node.nodeName
+            if (
+                child_node.firstChild is not None
+                and child_node.firstChild.nodeValue is not None
+            ):
+                extracted_properties[node_name] = {
+                    "value": child_node.firstChild.nodeValue
+                }
 
-            for node in [
-                e
-                for e in parsed_xml.childNodes
-                if e.nodeType == e.ELEMENT_NODE and e.namespaceURI == CMISRA_NS
-            ]:
-                propertyName = node.nodeName
-                if node.childNodes:
-                    propertyValue = node.firstChild.nodeValue
-                else:
-                    propertyValue = None
-                extracted_properties[propertyName] = {"value": propertyValue}
+    for property_node in parsed_xml.getElementsByTagName("ns2:properties"):
+        for child_node in property_node.childNodes:
+            try:
+                property_name = child_node.attributes["propertyDefinitionId"].value
+            except KeyError:
+                continue
 
-            all_objects.append({"properties": extracted_properties})
-    else:
-        extracted_properties = {}
+            node_values = child_node.getElementsByTagName("ns2:value")
+            if len(node_values) == 0:
+                extracted_properties[property_name] = {"value": None}
+            else:
+                extracted_properties[property_name] = {
+                    "value": parsePropValue(
+                        node_values[0].childNodes[0].data, child_node.localName
+                    )
+                }
 
-        for node in parsed_xml.getElementsByTagName(f"{cmis_action}Response"):
-            for child_node in node.childNodes:
-                node_name = child_node.nodeName
-                if child_node.firstChild is not None:
-                    extracted_properties[node_name] = {
-                        "value": child_node.firstChild.nodeValue
-                    }
-
-        for property_node in parsed_xml.getElementsByTagName("ns2:properties"):
-            for child_node in property_node.childNodes:
-                try:
-                    property_name = child_node.attributes["propertyDefinitionId"].value
-                except KeyError:
-                    continue
-
-                node_values = child_node.getElementsByTagName("ns2:value")
-                if len(node_values) == 0:
-                    extracted_properties[property_name] = {"value": None}
-                else:
-                    extracted_properties[property_name] = {
-                        "value": node_values[0].childNodes[0].data
-                    }
-
-        all_objects.append({"properties": extracted_properties})
+    all_objects.append({"properties": extracted_properties})
 
     return all_objects
 
@@ -325,6 +286,37 @@ def extract_num_items(xml_data: str) -> int:
     parsed_xml = minidom.parseString(xml_data)
     folder_id_node = parsed_xml.getElementsByTagName("numItems")[0]
     return int(folder_id_node.firstChild.nodeValue)
+
+
+def extract_content_stream_properties_from_xml(xml_data: str) -> dict:
+    parsed_xml = minidom.parseString(xml_data)
+
+    properties = {}
+    for content_stream_node in parsed_xml.getElementsByTagName("contentStream"):
+        for prop_node in content_stream_node.childNodes:
+            if prop_node.nodeName == "stream":
+                value = prop_node.firstChild.attributes["href"].nodeValue
+            else:
+                value = prop_node.firstChild.nodeValue
+            properties[prop_node.nodeName] = value
+
+    return properties
+
+
+# FIXME find a better way to do this
+def extract_content(soap_response_body: str) -> BytesIO:
+    xml_response = extract_xml_from_soap(soap_response_body)
+    extracted_data = extract_content_stream_properties_from_xml(xml_response)
+
+    # After the filename comes the file content
+    last_header = (
+        f"Content-Disposition: attachment;name=\"{extracted_data['filename']}\""
+    )
+    idx_content = soap_response_body.find(last_header) + len(last_header)
+    content_with_boundary = soap_response_body[idx_content:]
+    content = re.search("\r\n\r\n(.+?)\r\n--uuid:.+?--", content_with_boundary).group(1)
+
+    return BytesIO(content.encode())
 
 
 def get_xml_doc(

@@ -1,14 +1,16 @@
-import requests
-from requests import Response
+from typing import BinaryIO, List, Optional, Tuple
 
+import requests
 from client.query import CMISQuery
 from cmis.utils import (
-    get_xml_doc,
-    extract_xml_from_soap,
+    extract_folders_from_xml,
+    extract_properties_from_xml,
     extract_repository_id_from_xml,
     extract_root_folder_id_from_xml,
-    extract_folders_from_xml,
+    extract_xml_from_soap,
+    get_xml_doc,
 )
+from requests import Response
 
 
 class SOAPCMISRequest:
@@ -26,6 +28,8 @@ class SOAPCMISRequest:
         "Content-Transfer-Encoding": "8bit",
         "Content-ID": "<rootpart@soapui.org>",
     }
+
+    _main_repo_id = None
 
     @property
     def config(self):
@@ -80,7 +84,19 @@ class SOAPCMISRequest:
 
         return self._root_folder_id
 
-    def request(self, path: str, soap_envelope: str) -> Response:
+    def request(
+        self,
+        path: str,
+        soap_envelope: str,
+        attachments: List[Tuple[str, BinaryIO]] = None,
+    ) -> str:
+        """Make request with MTOM attachment.
+
+        :param path: string, path where to post the request
+        :param soap_envelope: string, XML which can contain zero or more references to attachments (in the form of `cid:<contentId>`)
+        :param attachments: list of tuples, each tuple contains the content ID used in the XML (string) and the I/O stream for the attachment.
+        :return: string, the content of the response
+        """
         url = f"http://localhost:8082/alfresco/cmisws/{path.lstrip('/')}"
 
         envelope_header = ""
@@ -88,8 +104,24 @@ class SOAPCMISRequest:
             envelope_header += f"{key}: {value}\n"
 
         # Format the body of the request
-        body = f"\n{self._boundary}\n{envelope_header}\n{soap_envelope}\n\n{self._boundary}--\n"
+        body = f"\n{self._boundary}\n{envelope_header}\n{soap_envelope}\n\n"
 
+        # Adding the attachments
+        if attachments is not None:
+            for attachment in attachments:
+                file_attachment_headers = {
+                    "Content-Type": "application/octet-stream",
+                    "Content-Transfer-Encoding": "binary",
+                    "Content-ID": f"<{attachment[0]}>",
+                }
+
+                xml_attachment_header = ""
+                for key, value in file_attachment_headers.items():
+                    xml_attachment_header += f"{key}: {value}\n"
+
+                body += f"{self._boundary}\n{xml_attachment_header}\n{attachment[1].read().decode('UTF-8')}"
+
+        body += f"{self._boundary}--\n"
         soap_response = requests.post(url, data=body, headers=self._headers, files=[])
         soap_response.raise_for_status()
 
