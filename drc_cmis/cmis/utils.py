@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
 from json.decoder import JSONDecodeError
@@ -7,7 +8,6 @@ from typing import List, Optional
 from xml.dom import minidom
 
 import requests
-from cmislib.atompub_binding import CMIS_NS, CMISRA_NS, getElementNameAndValues
 from cmislib.util import parsePropValue
 
 from drc_cmis.client.exceptions import (
@@ -172,58 +172,72 @@ class CMISRequest:
         return objects
 
 
-# TODO clean up this function from unneeded functionality
-def extract_properties_from_xml(xml_data, cmis_action=None) -> List[dict]:
-    """
+def extract_object_properties_from_xml(xml_data: str, cmis_action: str) -> List[dict]:
+    """Extract properties returned in a XML SOAP response.
+
     Function adapted from cmislib. It parses a XML response and extracts properties to a dictionary.
     The dictionary has format
 
     {"properties":
         {"property_name_1": {"value": "property_value_1"}, "property_name_2": {"value": "property_value_2"}}
     }
+
     so that it is in the same format as when the browser binding is used.
     For each document/folder in the response, a dictionary is created.
     All the dictionaries are then combined to a list.
 
-    :param xml_data: binary XML data
+    :param xml_data: string, XML data
+    :param cmis_action: string, name of the CMIS action that was used in the request, e.g. createDocument
     :return: list of dictionaries with the properties.
     """
+
+    def extract_properties(xml_node: minidom.Element) -> dict:
+        """Extract properties in the <ns2:properties> tag of the provided node
+
+        :param xml_node: minidom.Element, parsed XML node
+        :return: dict, with the extracted properties.
+        """
+        properties = {}
+        for property_node in xml_node.getElementsByTagName("ns2:properties"):
+            for child_node in property_node.childNodes:
+                try:
+                    property_name = child_node.attributes["propertyDefinitionId"].value
+                except KeyError:
+                    continue
+
+                node_values = child_node.getElementsByTagName("ns2:value")
+                if len(node_values) == 0 or len(node_values[0].childNodes) == 0:
+                    properties[property_name] = {"value": None}
+                else:
+                    properties[property_name] = {
+                        "value": parsePropValue(
+                            node_values[0].childNodes[0].data, child_node.localName
+                        )
+                    }
+        return properties
+
     parsed_xml = minidom.parseString(xml_data)
 
     all_objects = []
 
-    extracted_properties = {}
-
     # When creating documents and folders this extracts the objectId
-    for node in parsed_xml.getElementsByTagName(f"{cmis_action}Response"):
-        for child_node in node.childNodes:
+    for action_node in parsed_xml.getElementsByTagName(f"{cmis_action}Response"):
+        for child_node in action_node.childNodes:
             node_name = child_node.nodeName
-            if (
-                child_node.firstChild is not None
-                and child_node.firstChild.nodeValue is not None
-            ):
-                extracted_properties[node_name] = {
-                    "value": child_node.firstChild.nodeValue
+
+            if node_name == "objectId":
+                extracted_properties = {
+                    node_name: {"value": child_node.firstChild.nodeValue}
                 }
-
-    for property_node in parsed_xml.getElementsByTagName("ns2:properties"):
-        for child_node in property_node.childNodes:
-            try:
-                property_name = child_node.attributes["propertyDefinitionId"].value
-            except KeyError:
-                continue
-
-            node_values = child_node.getElementsByTagName("ns2:value")
-            if len(node_values) == 0:
-                extracted_properties[property_name] = {"value": None}
-            else:
-                extracted_properties[property_name] = {
-                    "value": parsePropValue(
-                        node_values[0].childNodes[0].data, child_node.localName
-                    )
-                }
-
-    all_objects.append({"properties": extracted_properties})
+                all_objects.append({"properties": extracted_properties})
+            if node_name == "object":
+                extracted_properties = extract_properties(child_node)
+                all_objects.append({"properties": extracted_properties})
+            if node_name == "objects":
+                for object_nodes in child_node.childNodes:
+                    if len(object_nodes.getElementsByTagName("ns2:properties")) > 0:
+                        extracted_properties = extract_properties(object_nodes)
+                        all_objects.append({"properties": extracted_properties})
 
     return all_objects
 
@@ -240,45 +254,6 @@ def extract_root_folder_id_from_xml(xml_data: str) -> str:
 
     folder_id_node = parsed_xml.getElementsByTagName("ns2:rootFolderId")[0]
     return folder_id_node.firstChild.nodeValue
-
-
-def extract_folders_from_xml(xml_data: str) -> List[dict]:
-    """Extract all the folders returned by a CMIS SQL query
-
-    The results are formatted as a list of dictionaries, where each dictionary
-    contains the properties of a folder.
-
-    :param xml_data: string, the xml soap envelope returned after a cmis SQL request
-    :return: List of dict, dictionaries containing the properties of the documents.
-    """
-
-    parsed_xml = minidom.parseString(xml_data)
-
-    folders = []
-
-    for response_node in parsed_xml.getElementsByTagName(f"queryResponse"):
-        for objects_node in response_node.childNodes:
-            for object_node in objects_node.childNodes:
-                folder = {}
-                for property_node in object_node.childNodes:
-                    for child_node in property_node.childNodes:
-                        try:
-                            property_name = child_node.attributes[
-                                "propertyDefinitionId"
-                            ].value
-                        except KeyError:
-                            continue
-
-                        node_values = child_node.getElementsByTagName("ns2:value")
-                        if len(node_values) == 0:
-                            folder[property_name] = {"value": None}
-                        else:
-                            folder[property_name] = {
-                                "value": node_values[0].childNodes[0].data
-                            }
-                folders.append({"properties": folder})
-
-    return folders
 
 
 def extract_num_items(xml_data: str) -> int:
@@ -356,12 +331,14 @@ def get_xml_doc(
     time_stamp_tag = xml_doc.createElement("Timestamp")
 
     created_tag = xml_doc.createElement("Created")
-    created_text = xml_doc.createTextNode("2013-07-31T11:11:56Z")
+    created_text = xml_doc.createTextNode(datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"))
     created_tag.appendChild(created_text)
     time_stamp_tag.appendChild(created_tag)
 
     expires_tag = xml_doc.createElement("Expires")
-    expires_text = xml_doc.createTextNode("2013-08-01T11:11:56Z")
+    expires_text = xml_doc.createTextNode(
+        (datetime.now() + timedelta(1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
     expires_tag.appendChild(expires_text)
     time_stamp_tag.appendChild(expires_tag)
 
@@ -394,7 +371,7 @@ def get_xml_doc(
     # Repository ID
     if repository_id is not None:
         repo_element = xml_doc.createElement("ns:repositoryId")
-        repo_text = xml_doc.createTextNode(repository_id)
+        repo_text = xml_doc.createTextNode(str(repository_id))
         repo_element.appendChild(repo_text)
         action_element.appendChild(repo_element)
 
@@ -427,14 +404,14 @@ def get_xml_doc(
     # Folder ID
     if folder_id is not None:
         folder_element = xml_doc.createElement("ns:folderId")
-        folder_text = xml_doc.createTextNode(folder_id)
+        folder_text = xml_doc.createTextNode(str(folder_id))
         folder_element.appendChild(folder_text)
         action_element.appendChild(folder_element)
 
     # ObjectId
     if object_id is not None:
         object_id_element = xml_doc.createElement("ns:objectId")
-        object_id_text = xml_doc.createTextNode(object_id)
+        object_id_text = xml_doc.createTextNode(str(object_id))
         object_id_element.appendChild(object_id_text)
         action_element.appendChild(object_id_element)
 
@@ -506,6 +483,7 @@ def build_query_filters(filters, filter_string="", strip_end=False):
     return filter_string
 
 
+# FIXME Use the actual mapper
 property_name_type_map = {
     "cmis:contentStreamLength": "ns1:property",
     "cmis:versionLabel": "ns1:propertyDecimal",

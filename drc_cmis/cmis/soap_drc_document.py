@@ -1,19 +1,7 @@
 import logging
+import uuid
 from io import BytesIO
 from typing import List
-
-from client.query import CMISQuery
-from client.utils import get_random_string
-from cmis.soap_request import SOAPCMISRequest
-from cmis.utils import (
-    extract_content,
-    extract_content_stream_properties_from_xml,
-    extract_folders_from_xml,
-    extract_num_items,
-    extract_properties_from_xml,
-    extract_xml_from_soap,
-    get_xml_doc,
-)
 
 from drc_cmis.client.mapper import (
     CONNECTION_MAP,
@@ -21,6 +9,16 @@ from drc_cmis.client.mapper import (
     REVERSE_CONNECTION_MAP,
     REVERSE_DOCUMENT_MAP,
     mapper,
+)
+from drc_cmis.client.query import CMISQuery
+from drc_cmis.client.utils import get_random_string
+from drc_cmis.cmis.soap_request import SOAPCMISRequest
+from drc_cmis.cmis.utils import (
+    extract_content,
+    extract_num_items,
+    extract_object_properties_from_xml,
+    extract_xml_from_soap,
+    get_xml_doc,
 )
 
 logger = logging.getLogger(__name__)
@@ -91,41 +89,65 @@ class Document(CMISBaseObject):
 
         return props
 
-    def get_private_working_copy(self) -> "Document":
-        """Checkout the private working copy of the document"""
-        properties = {"objectId": self.versionSeriesCheckedOutId}
+    def checkout(self) -> "Document":
+        """Checkout a private working copy of the document"""
 
         soap_envelope = get_xml_doc(
             repository_id=self.main_repo_id,
-            properties=properties,
             cmis_action="checkOut",
+            object_id=str(self.objectId),
+        )
+
+        soap_response = self.request(
+            "VersioningService", soap_envelope=soap_envelope.toxml()
+        )
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_object_properties_from_xml(xml_response, "checkOut")[0]
+        pwd_id = extracted_data["properties"]["objectId"]["value"]
+
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id, object_id=pwd_id, cmis_action="getObject",
         )
 
         soap_response = self.request(
             "ObjectService", soap_envelope=soap_envelope.toxml()
         )
+
         xml_response = extract_xml_from_soap(soap_response)
-        extracted_data = extract_properties_from_xml(xml_response, "createFolder")[0]
+        # Maybe catch the exception for now and retrieve all the versions, then get the last one?
+        extracted_data = extract_object_properties_from_xml(
+            xml_response, "getObject")[0]
+
         return type(self)(extracted_data)
 
     def update_properties(self, properties: dict) -> "Document":
 
         properties["objectId"] = self.objectId
 
+        # Check if the content of the document needs updating
+        content_id = None
+        attachments = None
+        if properties.get("inhoud") is not None:
+            content_id = str(uuid.uuid4())
+            attachments = [(content_id, properties.pop("inhoud"))]
+
         soap_envelope = get_xml_doc(
             repository_id=self.main_repo_id,
             properties=properties,
             cmis_action="updateProperties",
+            content_id=content_id,
         )
 
         soap_response = self.request(
-            "ObjectService", soap_envelope=soap_envelope.toxml()
+            "ObjectService",
+            soap_envelope=soap_envelope.toxml(),
+            attachments=attachments,
         )
 
         xml_response = extract_xml_from_soap(soap_response)
-        extracted_data = extract_properties_from_xml(xml_response, "updateProperties")[
-            0
-        ]
+        extracted_data = extract_object_properties_from_xml(
+            xml_response, "updateProperties"
+        )[0]
         # TODO this may need re-fetching the updated document
         return type(self)(extracted_data)
 
@@ -146,6 +168,11 @@ class Document(CMISBaseObject):
 
 class Folder(CMISBaseObject):
     def __getattr__(self, name):
+        try:
+            return super(SOAPCMISRequest, self).__getattribute__(name)
+        except AttributeError:
+            pass
+
         if name in self.properties:
             return self.properties[name]["value"]
 
@@ -153,7 +180,7 @@ class Folder(CMISBaseObject):
         if convert_name in self.properties:
             return self.properties[convert_name]["value"]
 
-        # raise AttributeError(f"No property '{convert_name}'")     #FIXME this may fail silently!
+        raise AttributeError(f"No property '{convert_name}'")
 
     def get_children_folders(self) -> List:
         """Get all the folders in the current folder"""
@@ -174,5 +201,9 @@ class Folder(CMISBaseObject):
         if num_items == 0:
             return []
 
-        extracted_data = extract_folders_from_xml(xml_response)
+        extracted_data = extract_object_properties_from_xml(xml_response, "query")
         return [type(self)(folder) for folder in extracted_data]
+
+    #TODO
+    def delete_tree(self):
+        pass

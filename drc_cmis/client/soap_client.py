@@ -6,28 +6,29 @@ from uuid import UUID
 
 from django.utils.crypto import constant_time_compare
 
-from client.exceptions import (
+from cmislib.domain import CmisId
+from cmislib.exceptions import UpdateConflictException
+
+from drc_cmis.client.exceptions import (
+    CmisUpdateConflictException,
     DocumentConflictException,
     DocumentDoesNotExistError,
     DocumentExistsError,
     DocumentLockConflictException,
+    DocumentLockedException,
     DocumentNotLockedException,
 )
-from client.query import CMISQuery
-from cmis.soap_drc_document import Document, Folder
-from cmis.soap_request import SOAPCMISRequest
-from cmis.utils import (
+from drc_cmis.client.mapper import mapper
+from drc_cmis.client.query import CMISQuery
+from drc_cmis.cmis.soap_drc_document import Document, Folder
+from drc_cmis.cmis.soap_request import SOAPCMISRequest
+from drc_cmis.cmis.utils import (
     build_query_filters,
-    extract_folders_from_xml,
     extract_num_items,
-    extract_properties_from_xml,
-    extract_repository_id_from_xml,
-    extract_root_folder_id_from_xml,
+    extract_object_properties_from_xml,
     extract_xml_from_soap,
     get_xml_doc,
 )
-from cmislib.domain import CmisId
-from cmislib.exceptions import UpdateConflictException
 
 
 class SOAPCMISClient(SOAPCMISRequest):
@@ -54,16 +55,16 @@ class SOAPCMISClient(SOAPCMISRequest):
             xml_response = extract_xml_from_soap(soap_response)
             num_items = extract_num_items(xml_response)
             if num_items > 0:
-                extracted_data = extract_folders_from_xml(xml_response)
+                extracted_data = extract_object_properties_from_xml(
+                    xml_response, "query"
+                )
                 folders = [Folder(data) for data in extracted_data]
             else:
                 folders = []
 
             # Check if the base folder has already been created
             for folder in folders:
-                # FIXME migration for the CMISConfig
-                # if folder.name == self.base_folder_name:
-                if folder.name == "DRC":
+                if folder.name == self.base_folder_name:
                     self._base_folder = folder
                     break
 
@@ -88,7 +89,8 @@ class SOAPCMISClient(SOAPCMISRequest):
             "DiscoveryService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
-        extracted_data = extract_properties_from_xml(xml_response, "query")
+        extracted_data = extract_object_properties_from_xml(xml_response, "query")
+
         return [return_type(cmis_object) for cmis_object in extracted_data]
 
     def get_or_create_folder(self, name: str, parent: Folder) -> Folder:
@@ -131,17 +133,19 @@ class SOAPCMISClient(SOAPCMISRequest):
         )
 
         xml_response = extract_xml_from_soap(soap_response)
-        extracted_data = extract_properties_from_xml(xml_response, "createFolder")[0]
+        extracted_data = extract_object_properties_from_xml(
+            xml_response, "createFolder"
+        )[0]
         return Folder(extracted_data)
 
     def create_document(
-        self, identification: str, data: dict, content: Optional[BytesIO] = None
+        self, identification: str, data: dict, content: BytesIO = None
     ) -> Document:
 
         self.check_document_exists(identification)
 
         now = datetime.datetime.now()
-        data.setdefault("versie", 1)
+        data.setdefault("versie", "1")
 
         content_id = str(uuid.uuid4())
         if content is None:
@@ -154,8 +158,6 @@ class SOAPCMISClient(SOAPCMISRequest):
         properties = Document.build_properties(
             data, new=True, identification=identification
         )
-
-        # TODO Add content of document
 
         soap_envelope = get_xml_doc(
             repository_id=self.main_repo_id,
@@ -173,7 +175,9 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         xml_response = extract_xml_from_soap(soap_response)
         # Creating the document only returns its ID
-        extracted_data = extract_properties_from_xml(xml_response, "createDocument")[0]
+        extracted_data = extract_object_properties_from_xml(
+            xml_response, "createDocument"
+        )[0]
         new_document_id = extracted_data["properties"]["objectId"]["value"]
 
         # Request all the properties of the newly created document
@@ -188,9 +192,31 @@ class SOAPCMISClient(SOAPCMISRequest):
         )
 
         xml_response = extract_xml_from_soap(soap_response)
-        extracted_data = extract_properties_from_xml(xml_response, "getObject")[0]
+        extracted_data = extract_object_properties_from_xml(xml_response, "getObject")[
+            0
+        ]
 
         return Document(extracted_data)
+
+    def lock_document(self, uuid: str, lock: str):
+        cmis_doc = self.get_document(uuid)
+
+        already_locked = DocumentLockedException(
+            "Document was already checked out", code="double_lock"
+        )
+
+        try:
+            pwc = cmis_doc.checkout()
+            assert (
+                pwc.isPrivateWorkingCopy
+            ), "checkout result must be a private working copy"
+            if pwc.lock:
+                raise already_locked
+
+            # store the lock value on the PWC so we can compare it later
+            pwc.update_properties({mapper("lock"): lock})
+        except CmisUpdateConflictException as exc:
+            raise already_locked from exc
 
     def update_document(
         self, uuid: str, lock: str, data: dict, content: Optional[BytesIO] = None
@@ -265,8 +291,11 @@ class SOAPCMISClient(SOAPCMISRequest):
             "DiscoveryService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
-        # TODO check number of Docs returned and raise an error if there are more than 1
-        extracted_data = extract_properties_from_xml(xml_response, "query")[0]
+        num_items = extract_num_items(xml_response)
+        if num_items == 0:
+            raise does_not_exist
+
+        extracted_data = extract_object_properties_from_xml(xml_response, "query")[0]
         return Document(extracted_data)
 
     def check_document_exists(self, identification: Union[str, UUID]):

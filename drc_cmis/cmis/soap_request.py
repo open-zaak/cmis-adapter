@@ -1,16 +1,13 @@
 from typing import BinaryIO, List, Optional, Tuple
 
 import requests
-from client.query import CMISQuery
-from cmis.utils import (
-    extract_folders_from_xml,
-    extract_properties_from_xml,
+
+from drc_cmis.cmis.utils import (
     extract_repository_id_from_xml,
     extract_root_folder_id_from_xml,
     extract_xml_from_soap,
     get_xml_doc,
 )
-from requests import Response
 
 
 class SOAPCMISRequest:
@@ -88,7 +85,7 @@ class SOAPCMISRequest:
         self,
         path: str,
         soap_envelope: str,
-        attachments: List[Tuple[str, BinaryIO]] = None,
+        attachments: Optional[List[Tuple[str, BinaryIO]]] = None,
     ) -> str:
         """Make request with MTOM attachment.
 
