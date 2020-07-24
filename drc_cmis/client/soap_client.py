@@ -5,9 +5,11 @@ from typing import List, Optional, Union
 from uuid import UUID
 
 from django.utils.crypto import constant_time_compare
+from django.utils.translation import ugettext_lazy as _
 
 from cmislib.domain import CmisId
 from cmislib.exceptions import UpdateConflictException
+from rest_framework.exceptions import ValidationError
 
 from drc_cmis.client.exceptions import (
     CmisUpdateConflictException,
@@ -20,7 +22,13 @@ from drc_cmis.client.exceptions import (
 )
 from drc_cmis.client.mapper import mapper
 from drc_cmis.client.query import CMISQuery
-from drc_cmis.cmis.soap_drc_document import Document, Folder
+from drc_cmis.client.utils import get_random_string
+from drc_cmis.cmis.soap_drc_document import (
+    Document,
+    Folder,
+    Gebruiksrechten,
+    ObjectInformatieObject,
+)
 from drc_cmis.cmis.soap_request import SOAPCMISRequest
 from drc_cmis.cmis.utils import (
     build_query_filters,
@@ -29,6 +37,26 @@ from drc_cmis.cmis.utils import (
     extract_xml_from_soap,
     get_xml_doc,
 )
+
+
+class CMISClientException(ValidationError):
+    def __init__(
+        self,
+        detail,
+        create=False,
+        update=False,
+        retreive_single=False,
+        delete=False,
+        retreive_list=False,
+        code=None,
+    ):
+        self.create = create
+        self.update = update
+        self.retreive_single = retreive_single
+        self.delete = delete
+        self.retreive_list = retreive_list
+
+        super().__init__(detail, code)
 
 
 class SOAPCMISClient(SOAPCMISRequest):
@@ -138,6 +166,77 @@ class SOAPCMISClient(SOAPCMISRequest):
         )[0]
         return Folder(extracted_data)
 
+    def delete_cmis_folders_in_base(self):
+        self.base_folder.delete_tree()
+
+    # TODO Generalise so that it creates "Documents" too
+    def create_content_object(
+        self, data: dict, object_type: str
+    ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
+        """Create a Gebruiksrechten or a ObjectInformatieObject
+
+        :param data: dict, properties of the object to create
+        :param object_type: string, either "gebruiksrechten" or "oio"
+        :return: Either a Gebruiksrechten or ObjectInformatieObject
+        """
+        assert object_type in [
+            "gebruiksrechten",
+            "oio",
+        ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
+
+        now = datetime.datetime.now()
+        year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
+        month_folder = self.get_or_create_folder(str(now.month), year_folder)
+        day_folder = self.get_or_create_folder(str(now.day), month_folder)
+        object_folder = self.get_or_create_folder(object_type.capitalize(), day_folder)
+
+        properties = {
+            mapper(key, type=object_type): value
+            for key, value in data.items()
+            if mapper(key, type=object_type)
+        }
+
+        properties.setdefault("cmis:objectTypeId", f"D:drc:{object_type}")
+        properties.setdefault("cmis:name", get_random_string())
+
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            folder_id=object_folder.objectId,
+            properties=properties,
+            cmis_action="createDocument",
+        )
+
+        soap_response = self.request(
+            "ObjectService", soap_envelope=soap_envelope.toxml(),
+        )
+
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_object_properties_from_xml(
+            xml_response, "createDocument"
+        )[0]
+        new_object_id = extracted_data["properties"]["objectId"]["value"]
+
+        # Request all the properties of the newly created object
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            object_id=new_object_id,
+            cmis_action="getObject",
+        )
+
+        soap_response = self.request(
+            "ObjectService", soap_envelope=soap_envelope.toxml()
+        )
+
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_object_properties_from_xml(xml_response, "getObject")[
+            0
+        ]
+
+        if object_type == "oio":
+            return ObjectInformatieObject(extracted_data)
+        elif object_type == "gebruiksrechten":
+            return Gebruiksrechten(extracted_data)
+
     def create_document(
         self, identification: str, data: dict, content: BytesIO = None
     ) -> Document:
@@ -154,6 +253,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
         month_folder = self.get_or_create_folder(str(now.month), year_folder)
         day_folder = self.get_or_create_folder(str(now.day), month_folder)
+        document_folder = self.get_or_create_folder("Documents", day_folder)
 
         properties = Document.build_properties(
             data, new=True, identification=identification
@@ -161,7 +261,7 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         soap_envelope = get_xml_doc(
             repository_id=self.main_repo_id,
-            folder_id=day_folder.objectId,
+            folder_id=document_folder.objectId,
             properties=properties,
             cmis_action="createDocument",
             content_id=content_id,
@@ -207,8 +307,11 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         try:
             pwc = cmis_doc.checkout()
+            # assert (
+            #     pwc.isPrivateWorkingCopy
+            # ), "checkout result must be a private working copy"
             assert (
-                pwc.isPrivateWorkingCopy
+                pwc.versionLabel == "pwc"
             ), "checkout result must be a private working copy"
             if pwc.lock:
                 raise already_locked
@@ -217,6 +320,18 @@ class SOAPCMISClient(SOAPCMISRequest):
             pwc.update_properties({mapper("lock"): lock})
         except CmisUpdateConflictException as exc:
             raise already_locked from exc
+
+    def unlock_document(self, uuid: str, lock: str, force: bool = False):
+        cmis_doc = self.get_document(uuid)
+        pwc = cmis_doc.get_private_working_copy()
+
+        if constant_time_compare(pwc.lock, lock) or force:
+            pwc.update_properties({mapper("lock"): ""})
+            return pwc.checkin("Updated via Documenten API")
+
+        raise CMISClientException(
+            detail=_("Lock did not match"), update=True, code="unlock-failed"
+        )
 
     def update_document(
         self, uuid: str, lock: str, data: dict, content: Optional[BytesIO] = None

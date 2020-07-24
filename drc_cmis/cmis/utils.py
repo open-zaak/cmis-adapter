@@ -234,10 +234,14 @@ def extract_object_properties_from_xml(xml_data: str, cmis_action: str) -> List[
                 extracted_properties = extract_properties(child_node)
                 all_objects.append({"properties": extracted_properties})
             if node_name == "objects":
-                for object_nodes in child_node.childNodes:
-                    if len(object_nodes.getElementsByTagName("ns2:properties")) > 0:
-                        extracted_properties = extract_properties(object_nodes)
-                        all_objects.append({"properties": extracted_properties})
+                if len(child_node.getElementsByTagName("objects")) > 0:
+                    for object_nodes in child_node.childNodes:
+                        if len(object_nodes.getElementsByTagName("ns2:properties")) > 0:
+                            extracted_properties = extract_properties(object_nodes)
+                            all_objects.append({"properties": extracted_properties})
+                elif len(child_node.getElementsByTagName("ns2:properties")) > 0:
+                    extracted_properties = extract_properties(child_node)
+                    all_objects.append({"properties": extracted_properties})
 
     return all_objects
 
@@ -514,4 +518,12 @@ property_name_type_map = {
     "drc:document__creatiedatum": "ns1:propertyDateTime",
     "drc:document__versie": "ns1:propertyDecimal",
     "drc:document__lock": "ns1:propertyString",
+    "drc:oio__object_type": "ns1:propertyString",
+    "drc:oio__besluit": "ns1:propertyString",
+    "drc:oio__zaak": "ns1:propertyString",
+    "drc:oio__informatieobject": "ns1:propertyString",
+    "drc:gebruiksrechten__einddatum": "ns1:propertyDateTime",
+    "drc:gebruiksrechten__omschrijving_voorwaarden": "ns1:propertyString",
+    "drc:gebruiksrechten__informatieobject": "ns1:propertyString",
+    "drc:gebruiksrechten__startdatum": "ns1:propertyDateTime",
 }

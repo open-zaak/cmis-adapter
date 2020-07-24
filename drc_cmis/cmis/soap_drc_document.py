@@ -3,9 +3,13 @@ import uuid
 from io import BytesIO
 from typing import List
 
+import requests
+
 from drc_cmis.client.mapper import (
     CONNECTION_MAP,
     DOCUMENT_MAP,
+    GEBRUIKSRECHTEN_MAP,
+    OBJECTINFORMATIEOBJECT_MAP,
     REVERSE_CONNECTION_MAP,
     REVERSE_DOCUMENT_MAP,
     mapper,
@@ -25,15 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 class CMISBaseObject(SOAPCMISRequest):
+    name_map = None
+
     def __init__(self, data):
         super().__init__()
         self.data = data
         self.properties = dict(data.get("properties", {}))
-
-
-class Document(CMISBaseObject):
-    table = "drc:document"
-    object_type_id = f"D:{table}"
 
     def __getattr__(self, name: str):
         try:
@@ -41,21 +42,42 @@ class Document(CMISBaseObject):
         except AttributeError:
             pass
 
-        convert_string = f"drc:{name}"
-        if name in DOCUMENT_MAP:
-            convert_string = DOCUMENT_MAP.get(name)
+        if name in self.properties:
+            return self.properties[name]["value"]
+
+        convert_name = f"cmis:{name}"
+        if convert_name in self.properties:
+            return self.properties[convert_name]["value"]
+
+        convert_name = f"drc:{name}"
+        if name in self.name_map:
+            convert_name = self.name_map.get(name)
         elif name in CONNECTION_MAP:
-            convert_string = CONNECTION_MAP.get(name)
-        elif (
-            convert_string not in REVERSE_CONNECTION_MAP
-            and convert_string not in REVERSE_DOCUMENT_MAP
-        ):
-            convert_string = f"cmis:{name}"
+            convert_name = CONNECTION_MAP.get(name)
 
-        if convert_string not in self.properties:
-            raise AttributeError(f"No property '{convert_string}'")
+        if convert_name not in self.properties:
+            raise AttributeError(f"No property '{convert_name}'")
 
-        return self.properties[convert_string]["value"]
+        return self.properties[convert_name]["value"]
+
+
+class CMISContentObject(CMISBaseObject):
+    def delete_object(self):
+        """Delete all versions of an object"""
+
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            object_id=self.objectId,
+            cmis_action="deleteObject",
+        )
+
+        self.request("ObjectService", soap_envelope=soap_envelope.toxml())
+
+
+class Document(CMISContentObject):
+    table = "drc:document"
+    object_type_id = f"D:{table}"
+    name_map = DOCUMENT_MAP
 
     @classmethod
     def build_properties(
@@ -68,7 +90,7 @@ class Document(CMISBaseObject):
             if not prop_name:
                 logger.debug("No property name found for key '%s'", key)
                 continue
-            props[prop_name] = value
+            props[prop_name] = str(value)
 
         if new:
             props.setdefault("cmis:objectTypeId", cls.object_type_id)
@@ -82,12 +104,31 @@ class Document(CMISBaseObject):
             # identificatie is immutable once the document is created
             if identification:
                 prop_name = mapper("identificatie")
-                props[prop_name] = identification
+                props[prop_name] = str(identification)
 
         # can't or shouldn't be written
         props.pop(mapper("uuid"), None)
 
         return props
+
+    def get_document(self, object_id: str) -> "Document":
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            object_id=object_id,
+            cmis_action="getObject",
+        )
+
+        soap_response = self.request(
+            "ObjectService", soap_envelope=soap_envelope.toxml()
+        )
+
+        xml_response = extract_xml_from_soap(soap_response)
+        # Maybe catch the exception for now and retrieve all the versions, then get the last one?
+        extracted_data = extract_object_properties_from_xml(xml_response, "getObject")[
+            0
+        ]
+
+        return type(self)(extracted_data)
 
     def checkout(self) -> "Document":
         """Checkout a private working copy of the document"""
@@ -98,31 +139,58 @@ class Document(CMISBaseObject):
             object_id=str(self.objectId),
         )
 
+        # FIXME temporary solution due to alfresco problem
+        try:
+            soap_response = self.request(
+                "VersioningService", soap_envelope=soap_envelope.toxml()
+            )
+            xml_response = extract_xml_from_soap(soap_response)
+            extracted_data = extract_object_properties_from_xml(
+                xml_response, "checkOut"
+            )[0]
+            pwc_id = extracted_data["properties"]["objectId"]["value"]
+        except requests.exceptions.HTTPError:
+            pwc_document = self.get_private_working_copy()
+            pwc_id = pwc_document.objectId
+
+        return self.get_document(pwc_id)
+
+    def checkin(self, checkin_comment: str, major: bool = True) -> "Document":
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            cmis_action="checkIn",
+            object_id=str(self.objectId),
+        )
+
         soap_response = self.request(
             "VersioningService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
-        extracted_data = extract_object_properties_from_xml(xml_response, "checkOut")[0]
-        pwd_id = extracted_data["properties"]["objectId"]["value"]
+        extracted_data = extract_object_properties_from_xml(xml_response, "checkIn")[0]
+        doc_id = extracted_data["properties"]["objectId"]["value"]
 
+        return self.get_document(doc_id)
+
+    def get_private_working_copy(self):
+        """Get the version of the document with version label 'pwc'"""
         soap_envelope = get_xml_doc(
-            repository_id=self.main_repo_id, object_id=pwd_id, cmis_action="getObject",
+            repository_id=self.main_repo_id,
+            cmis_action="getAllVersions",
+            object_id=str(self.objectId),
         )
-
         soap_response = self.request(
-            "ObjectService", soap_envelope=soap_envelope.toxml()
+            "VersioningService", soap_envelope=soap_envelope.toxml()
         )
-
         xml_response = extract_xml_from_soap(soap_response)
-        # Maybe catch the exception for now and retrieve all the versions, then get the last one?
         extracted_data = extract_object_properties_from_xml(
-            xml_response, "getObject")[0]
-
-        return type(self)(extracted_data)
+            xml_response, "getAllVersions"
+        )
+        documents = [Document(data) for data in extracted_data]
+        for document in documents:
+            if document.versionLabel == "pwc":
+                return document
 
     def update_properties(self, properties: dict) -> "Document":
-
-        properties["objectId"] = self.objectId
 
         # Check if the content of the document needs updating
         content_id = None
@@ -136,6 +204,7 @@ class Document(CMISBaseObject):
             properties=properties,
             cmis_action="updateProperties",
             content_id=content_id,
+            object_id=self.objectId,
         )
 
         soap_response = self.request(
@@ -166,22 +235,19 @@ class Document(CMISBaseObject):
         return extract_content(soap_response)
 
 
+class Gebruiksrechten(CMISContentObject):
+    table = "drc:gebruiksrechten"
+    object_type_id = f"D:{table}"
+    name_map = GEBRUIKSRECHTEN_MAP
+
+
+class ObjectInformatieObject(CMISContentObject):
+    table = "drc:oio"
+    object_type_id = f"D:{table}"
+    name_map = OBJECTINFORMATIEOBJECT_MAP
+
+
 class Folder(CMISBaseObject):
-    def __getattr__(self, name):
-        try:
-            return super(SOAPCMISRequest, self).__getattribute__(name)
-        except AttributeError:
-            pass
-
-        if name in self.properties:
-            return self.properties[name]["value"]
-
-        convert_name = f"cmis:{name}"
-        if convert_name in self.properties:
-            return self.properties[convert_name]["value"]
-
-        raise AttributeError(f"No property '{convert_name}'")
-
     def get_children_folders(self) -> List:
         """Get all the folders in the current folder"""
 
@@ -204,6 +270,13 @@ class Folder(CMISBaseObject):
         extracted_data = extract_object_properties_from_xml(xml_response, "query")
         return [type(self)(folder) for folder in extracted_data]
 
-    #TODO
     def delete_tree(self):
-        pass
+        """Delete the folder and all its contents"""
+
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            folder_id=self.objectId,
+            cmis_action="deleteTree",
+        )
+
+        self.request("ObjectService", soap_envelope=soap_envelope.toxml())
