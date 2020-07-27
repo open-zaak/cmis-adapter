@@ -237,6 +237,113 @@ class SOAPCMISClient(SOAPCMISRequest):
         elif object_type == "gebruiksrechten":
             return Gebruiksrechten(extracted_data)
 
+    def get_content_objects(self, object_type: str, filters: dict = None):
+        """Retrieve gebruiksrechten/oios based on the filters provided"""
+
+        assert object_type in [
+            "gebruiksrechten",
+            "oio",
+        ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
+
+        if filters.get("uuid") is not None:
+            results = [self.get_content_object(filters.get("uuid"), object_type)]
+            return {
+                "has_next": False,
+                "total_count": 1,
+                "has_prev": False,
+                "results": results,
+            }
+        else:
+            query = CMISQuery("SELECT * FROM drc:%s WHERE %s")
+
+            filter_string = build_query_filters(
+                filters, filter_string="AND ", strip_end=True
+            )
+
+            soap_envelope = get_xml_doc(
+                repository_id=self.main_repo_id,
+                statement=query(object_type, filter_string),
+                cmis_action="query",
+            )
+
+            soap_response = self.request(
+                "DiscoveryService", soap_envelope=soap_envelope.toxml()
+            )
+            xml_response = extract_xml_from_soap(soap_response)
+            num_items = extract_num_items(xml_response)
+            if num_items == 0:
+                return []
+            else:
+                extracted_data = extract_object_properties_from_xml(
+                    xml_response, "query"
+                )
+                if object_type == "gebruiksrechten":
+                    return_type = Gebruiksrechten
+                elif object_type == "oio":
+                    return_type = ObjectInformatieObject
+
+                return {
+                    "has_next": False,
+                    "total_count": num_items,
+                    "has_prev": False,
+                    "results": [return_type(obj_data) for obj_data in extracted_data],
+                }
+
+    def get_content_object(
+        self, uuid: Union[str, UUID], object_type: str
+    ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
+        """Get the gebruiksrechten/oio with specified uuid
+
+        :param uuid: string or UUID, identifier that when combined with 'workspace://SpacesStore/' and the version number gives the cmis:objectId
+        :param object_type: string, either "gebruiksrechten" or "oio"
+        :return: Either a Gebruiksrechten or ObjectInformatieObject
+        """
+
+        assert object_type in [
+            "gebruiksrechten",
+            "oio",
+        ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
+
+        query = CMISQuery(
+            "SELECT * FROM drc:%s WHERE cmis:objectId = 'workspace://SpacesStore/%s;1.0'"
+        )
+
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            statement=query(object_type, str(uuid)),
+            cmis_action="query",
+        )
+
+        soap_response = self.request(
+            "DiscoveryService", soap_envelope=soap_envelope.toxml()
+        )
+        xml_response = extract_xml_from_soap(soap_response)
+        num_items = extract_num_items(xml_response)
+
+        error_string = f"{object_type.capitalize()} document met identificatie {uuid} bestaat niet in het CMIS connection"
+        does_not_exist = DocumentDoesNotExistError(error_string)
+
+        if num_items == 0:
+            raise does_not_exist
+
+        extracted_data = extract_object_properties_from_xml(xml_response, "query")[0]
+
+        if object_type == "oio":
+            return ObjectInformatieObject(extracted_data)
+        elif object_type == "gebruiksrechten":
+            return Gebruiksrechten(extracted_data)
+
+    def delete_content_object(self, uuid: Union[str, UUID], object_type: str):
+        """Delete the gebruiksrechten/objectinformatieobject with specified uuid
+
+        :param uuid: string or UUID, identifier that when combined with 'workspace://SpacesStore/' and the version number gives the cmis:objectId
+        :param object_type: string, either "gebruiksrechten" or "oio"
+        :return: Either a Gebruiksrechten or ObjectInformatieObject
+        """
+
+        content_object = self.get_content_object(uuid, object_type=object_type)
+        content_object.delete_object()
+
     def create_document(
         self, identification: str, data: dict, content: BytesIO = None
     ) -> Document:
@@ -373,6 +480,9 @@ class SOAPCMISClient(SOAPCMISRequest):
         except UpdateConflictException as exc:
             # Node locked!
             raise DocumentConflictException from exc
+
+        # TODO update content
+        return pwc
 
     def get_document(
         self, uuid: Optional[str] = None, filters: Optional[dict] = None

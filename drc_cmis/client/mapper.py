@@ -86,7 +86,7 @@ def mapper(drc_name, type="document"):
         return ZAAK_MAP.get(drc_name, None)
     if type == "gebruiksrechten":
         return GEBRUIKSRECHTEN_MAP.get(drc_name, None)
-    if type == "objectinformatieobject":
+    if type == "oio":
         return OBJECTINFORMATIEOBJECT_MAP.get(drc_name, None)
     return None
 
@@ -102,6 +102,6 @@ def reverse_mapper(cmis_name, type="document"):
         return REVERSE_ZAAK_MAP.get(cmis_name, None)
     if type == "gebruiksrechten":
         return REVERSE_GEBRUIKSRECHTEN_MAP.get(cmis_name, None)
-    if type == "objectinformatieobject":
+    if type == "oio":
         return REVERSE_OBJECTINFORMATIEOBJECT_MAP.get(cmis_name, None)
     return None

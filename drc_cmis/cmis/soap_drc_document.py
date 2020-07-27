@@ -90,7 +90,8 @@ class Document(CMISContentObject):
             if not prop_name:
                 logger.debug("No property name found for key '%s'", key)
                 continue
-            props[prop_name] = str(value)
+            if value is not None:
+                props[prop_name] = str(value)
 
         if new:
             props.setdefault("cmis:objectTypeId", cls.object_type_id)
@@ -173,10 +174,11 @@ class Document(CMISContentObject):
 
     def get_private_working_copy(self):
         """Get the version of the document with version label 'pwc'"""
+        object_id = self.objectId.split(";")[0]
         soap_envelope = get_xml_doc(
             repository_id=self.main_repo_id,
             cmis_action="getAllVersions",
-            object_id=str(self.objectId),
+            object_id=object_id,
         )
         soap_response = self.request(
             "VersioningService", soap_envelope=soap_envelope.toxml()
@@ -217,8 +219,7 @@ class Document(CMISContentObject):
         extracted_data = extract_object_properties_from_xml(
             xml_response, "updateProperties"
         )[0]
-        # TODO this may need re-fetching the updated document
-        return type(self)(extracted_data)
+        return self.get_document(extracted_data["properties"]["objectId"]["value"])
 
     def get_content_stream(self) -> BytesIO:
         soap_envelope = get_xml_doc(
