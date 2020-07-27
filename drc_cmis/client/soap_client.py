@@ -414,9 +414,6 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         try:
             pwc = cmis_doc.checkout()
-            # assert (
-            #     pwc.isPrivateWorkingCopy
-            # ), "checkout result must be a private working copy"
             assert (
                 pwc.versionLabel == "pwc"
             ), "checkout result must be a private working copy"
@@ -476,12 +473,11 @@ class SOAPCMISClient(SOAPCMISRequest):
         }
 
         try:
-            pwc.update_properties(diff_properties)
+            pwc.update_properties(diff_properties, content)
         except UpdateConflictException as exc:
             # Node locked!
             raise DocumentConflictException from exc
 
-        # TODO update content
         return pwc
 
     def get_document(

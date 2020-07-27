@@ -1,10 +1,11 @@
 import logging
 import uuid
 from io import BytesIO
-from typing import List
+from typing import List, Optional
 
 import requests
 
+from drc_cmis.client.exceptions import CmisRuntimeException
 from drc_cmis.client.mapper import (
     CONNECTION_MAP,
     DOCUMENT_MAP,
@@ -150,7 +151,7 @@ class Document(CMISContentObject):
                 xml_response, "checkOut"
             )[0]
             pwc_id = extracted_data["properties"]["objectId"]["value"]
-        except requests.exceptions.HTTPError:
+        except CmisRuntimeException:
             pwc_document = self.get_private_working_copy()
             pwc_id = pwc_document.objectId
 
@@ -192,27 +193,22 @@ class Document(CMISContentObject):
             if document.versionLabel == "pwc":
                 return document
 
-    def update_properties(self, properties: dict) -> "Document":
-
+    def update_properties(
+        self, properties: dict, content: Optional[BytesIO] = None
+    ) -> "Document":
         # Check if the content of the document needs updating
-        content_id = None
-        attachments = None
-        if properties.get("inhoud") is not None:
-            content_id = str(uuid.uuid4())
-            attachments = [(content_id, properties.pop("inhoud"))]
+        if content is not None:
+            self.set_content_stream(content)
 
         soap_envelope = get_xml_doc(
             repository_id=self.main_repo_id,
             properties=properties,
             cmis_action="updateProperties",
-            content_id=content_id,
             object_id=self.objectId,
         )
 
         soap_response = self.request(
-            "ObjectService",
-            soap_envelope=soap_envelope.toxml(),
-            attachments=attachments,
+            "ObjectService", soap_envelope=soap_envelope.toxml(),
         )
 
         xml_response = extract_xml_from_soap(soap_response)
@@ -234,6 +230,23 @@ class Document(CMISContentObject):
 
         # FIXME find a better way to do this
         return extract_content(soap_response)
+
+    def set_content_stream(self, content: BytesIO):
+        content_id = str(uuid.uuid4())
+        attachments = [(content_id, content)]
+
+        soap_envelope = get_xml_doc(
+            repository_id=self.main_repo_id,
+            object_id=self.objectId,
+            cmis_action="setContentStream",
+            content_id=content_id,
+        )
+
+        self.request(
+            "ObjectService",
+            soap_envelope=soap_envelope.toxml(),
+            attachments=attachments,
+        )
 
 
 class Gebruiksrechten(CMISContentObject):

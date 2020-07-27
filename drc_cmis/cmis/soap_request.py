@@ -2,6 +2,15 @@ from typing import BinaryIO, List, Optional, Tuple
 
 import requests
 
+from drc_cmis.client.exceptions import (
+    CmisBaseException,
+    CmisInvalidArgumentException,
+    CmisNotSupportedException,
+    CmisObjectNotFoundException,
+    CmisPermissionDeniedException,
+    CmisRuntimeException,
+    CmisUpdateConflictException,
+)
 from drc_cmis.cmis.utils import (
     extract_repository_id_from_xml,
     extract_root_folder_id_from_xml,
@@ -116,10 +125,48 @@ class SOAPCMISRequest:
                 for key, value in file_attachment_headers.items():
                     xml_attachment_header += f"{key}: {value}\n"
 
-                body += f"{self._boundary}\n{xml_attachment_header}\n{attachment[1].read().decode('UTF-8')}"
+                attachment_content = attachment[1]
+                attachment_content.seek(0)
+                body += f"{self._boundary}\n{xml_attachment_header}\n{attachment_content.read().decode('UTF-8')}"
 
         body += f"{self._boundary}--\n"
         soap_response = requests.post(url, data=body, headers=self._headers, files=[])
-        soap_response.raise_for_status()
+        if not soap_response.ok:
+            error = soap_response.text
+            if soap_response.status_code == 401:
+                raise CmisPermissionDeniedException(
+                    status=soap_response.status_code, url=url, message=error, code=401,
+                )
+            elif soap_response.status_code == 400:
+                raise CmisInvalidArgumentException(
+                    status=soap_response.status_code, url=url, message=error, code=400,
+                )
+            elif soap_response.status_code == 404:
+                raise CmisObjectNotFoundException(
+                    status=soap_response.status_code, url=url, message=error, code=404,
+                )
+            elif soap_response.status_code == 403:
+                raise CmisPermissionDeniedException(
+                    status=soap_response.status_code, url=url, message=error, code=403,
+                )
+            elif soap_response.status_code == 405:
+                raise CmisNotSupportedException(
+                    status=soap_response.status_code, url=url, message=error, code=405,
+                )
+            elif soap_response.status_code == 409:
+                raise CmisUpdateConflictException(
+                    status=soap_response.status_code, url=url, message=error, code=409,
+                )
+            elif soap_response.status_code == 500:
+                raise CmisRuntimeException(
+                    status=soap_response.status_code, url=url, message=error, code=500,
+                )
+            else:
+                raise CmisBaseException(
+                    status=soap_response.status_code,
+                    url=url,
+                    message=error,
+                    code=soap_response.status_code,
+                )
 
         return soap_response.content.decode("UTF-8")
