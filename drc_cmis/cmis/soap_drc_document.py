@@ -23,7 +23,7 @@ from drc_cmis.cmis.utils import (
     extract_num_items,
     extract_object_properties_from_xml,
     extract_xml_from_soap,
-    get_xml_doc,
+    make_soap_envelope,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ class CMISContentObject(CMISBaseObject):
     def delete_object(self):
         """Delete all versions of an object"""
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             object_id=self.objectId,
             cmis_action="deleteObject",
@@ -114,7 +114,7 @@ class Document(CMISContentObject):
         return props
 
     def get_document(self, object_id: str) -> "Document":
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             object_id=object_id,
             cmis_action="getObject",
@@ -135,7 +135,7 @@ class Document(CMISContentObject):
     def checkout(self) -> "Document":
         """Checkout a private working copy of the document"""
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             cmis_action="checkOut",
             object_id=str(self.objectId),
@@ -158,10 +158,12 @@ class Document(CMISContentObject):
         return self.get_document(pwc_id)
 
     def checkin(self, checkin_comment: str, major: bool = True) -> "Document":
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             cmis_action="checkIn",
             object_id=str(self.objectId),
+            major=str(major).lower(),
+            checkin_comment=checkin_comment,
         )
 
         soap_response = self.request(
@@ -176,7 +178,7 @@ class Document(CMISContentObject):
     def get_private_working_copy(self):
         """Get the version of the document with version label 'pwc'"""
         object_id = self.objectId.split(";")[0]
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             cmis_action="getAllVersions",
             object_id=object_id,
@@ -200,7 +202,7 @@ class Document(CMISContentObject):
         if content is not None:
             self.set_content_stream(content)
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             properties=properties,
             cmis_action="updateProperties",
@@ -218,7 +220,7 @@ class Document(CMISContentObject):
         return self.get_document(extracted_data["properties"]["objectId"]["value"])
 
     def get_content_stream(self) -> BytesIO:
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             object_id=self.objectId,
             cmis_action="getContentStream",
@@ -235,7 +237,7 @@ class Document(CMISContentObject):
         content_id = str(uuid.uuid4())
         attachments = [(content_id, content)]
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             object_id=self.objectId,
             cmis_action="setContentStream",
@@ -267,7 +269,7 @@ class Folder(CMISBaseObject):
 
         query = CMISQuery(f"SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             statement=query(str(self.objectId)),
             cmis_action="query",
@@ -287,7 +289,7 @@ class Folder(CMISBaseObject):
     def delete_tree(self):
         """Delete the folder and all its contents"""
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             folder_id=self.objectId,
             cmis_action="deleteTree",

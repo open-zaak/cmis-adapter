@@ -298,7 +298,7 @@ def extract_content(soap_response_body: str) -> BytesIO:
     return BytesIO(content.encode())
 
 
-def get_xml_doc(
+def make_soap_envelope(
     cmis_action: str,
     repository_id: Optional[str] = None,
     properties: Optional[dict] = None,
@@ -306,6 +306,8 @@ def get_xml_doc(
     object_id: Optional[str] = None,
     folder_id: Optional[str] = None,
     content_id: Optional[str] = None,
+    major: Optional[str] = None,
+    checkin_comment: Optional[str] = None,
 ):
 
     xml_doc = minidom.Document()
@@ -437,6 +439,18 @@ def get_xml_doc(
         content_element.appendChild(stream_element)
 
         action_element.appendChild(content_element)
+
+    if major is not None:
+        major_element = xml_doc.createElement("ns:major")
+        major_text = xml_doc.createTextNode(major)
+        major_element.appendChild(major_text)
+        action_element.appendChild(major_element)
+
+    if checkin_comment is not None:
+        comment_element = xml_doc.createElement("ns:checkinComment")
+        comment_text = xml_doc.createTextNode(checkin_comment)
+        comment_element.appendChild(comment_text)
+        action_element.appendChild(comment_element)
 
     entry_element.appendChild(body_element)
 

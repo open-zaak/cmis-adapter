@@ -35,7 +35,7 @@ from drc_cmis.cmis.utils import (
     extract_num_items,
     extract_object_properties_from_xml,
     extract_xml_from_soap,
-    get_xml_doc,
+    make_soap_envelope,
 )
 
 
@@ -71,7 +71,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         if self._base_folder is None:
             query = CMISQuery(f"SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
 
-            soap_envelope = get_xml_doc(
+            soap_envelope = make_soap_envelope(
                 repository_id=self.main_repo_id,
                 statement=query(str(self.root_folder_id)),
                 cmis_action="query",
@@ -109,7 +109,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         where = (" WHERE " + " AND ".join(lhs)) if lhs else ""
         query = CMISQuery("SELECT * FROM %s%s" % (table, where))
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id, statement=query(*rhs), cmis_action="query"
         )
 
@@ -149,7 +149,7 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         properties = {"cmis:objectTypeId": object_type_id, "cmis:name": name}
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             folder_id=parent_id,
             properties=properties,
@@ -199,7 +199,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         properties.setdefault("cmis:objectTypeId", f"D:drc:{object_type}")
         properties.setdefault("cmis:name", get_random_string())
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             folder_id=object_folder.objectId,
             properties=properties,
@@ -217,7 +217,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         new_object_id = extracted_data["properties"]["objectId"]["value"]
 
         # Request all the properties of the newly created object
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             object_id=new_object_id,
             cmis_action="getObject",
@@ -260,7 +260,7 @@ class SOAPCMISClient(SOAPCMISRequest):
                 filters, filter_string="AND ", strip_end=True
             )
 
-            soap_envelope = get_xml_doc(
+            soap_envelope = make_soap_envelope(
                 repository_id=self.main_repo_id,
                 statement=query(object_type, filter_string),
                 cmis_action="query",
@@ -308,7 +308,7 @@ class SOAPCMISClient(SOAPCMISRequest):
             "SELECT * FROM drc:%s WHERE cmis:objectId = 'workspace://SpacesStore/%s;1.0'"
         )
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             statement=query(object_type, str(uuid)),
             cmis_action="query",
@@ -366,7 +366,7 @@ class SOAPCMISClient(SOAPCMISRequest):
             data, new=True, identification=identification
         )
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             folder_id=document_folder.objectId,
             properties=properties,
@@ -388,7 +388,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         new_document_id = extracted_data["properties"]["objectId"]["value"]
 
         # Request all the properties of the newly created document
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             object_id=new_document_id,
             cmis_action="getObject",
@@ -502,7 +502,7 @@ class SOAPCMISClient(SOAPCMISRequest):
             filters, filter_string="AND ", strip_end=True
         )
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             statement=query(uuid, filter_string),
             cmis_action="query",
@@ -526,7 +526,7 @@ class SOAPCMISClient(SOAPCMISRequest):
             f"SELECT * FROM drc:document WHERE drc:document__identificatie = '%s'"
         )
 
-        soap_envelope = get_xml_doc(
+        soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             statement=query(str(identification)),
             cmis_action="query",

@@ -15,7 +15,7 @@ from drc_cmis.cmis.utils import (
     extract_repository_id_from_xml,
     extract_root_folder_id_from_xml,
     extract_xml_from_soap,
-    get_xml_doc,
+    make_soap_envelope,
 )
 
 
@@ -63,7 +63,7 @@ class SOAPCMISRequest:
         """Get ID of the CMS main repository"""
 
         if self._main_repo_id is None:
-            soap_envelope = get_xml_doc(cmis_action="getRepositories")
+            soap_envelope = make_soap_envelope(cmis_action="getRepositories")
             soap_response = self.request(
                 "RepositoryService", soap_envelope=soap_envelope.toxml()
             )
@@ -78,7 +78,7 @@ class SOAPCMISRequest:
         """Get the ID of the folder where all folders/documents will be created"""
 
         if self._root_folder_id is None:
-            soap_envelope = get_xml_doc(
+            soap_envelope = make_soap_envelope(
                 cmis_action="getRepositoryInfo", repository_id=self.main_repo_id
             )
             soap_response = self.request(
