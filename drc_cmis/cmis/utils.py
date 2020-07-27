@@ -368,7 +368,7 @@ def make_soap_envelope(
     header_element.appendChild(security_header)
     entry_element.appendChild(header_element)
 
-    ## Body of the document
+    # Body of the document
     body_element = xml_doc.createElement("soapenv:Body")
 
     # The name of the next tag is the name of the CMIS action to perform (e.g. createFolder)
@@ -464,20 +464,28 @@ def extract_xml_from_soap(soap_response):
     return soap_response[begin_xml:end_xml]
 
 
-def build_query_filters(filters, filter_string="", strip_end=False):
+def build_query_filters(
+    filters: dict,
+    object_type: str = None,
+    filter_string: str = "",
+    strip_end: bool = False,
+):
     """Build filters for SQL query"""
-    from client.mapper import mapper
+    from drc_cmis.client.mapper import mapper
 
     if filters:
         for key, value in filters.items():
-            if mapper(key):
-                key = mapper(key)
-            elif mapper(key, type="connection"):
-                key = mapper(key, type="connection")
-            elif mapper(key, type="gebruiksrechten"):
-                key = mapper(key, type="gebruiksrechten")
-            elif mapper(key, type="objectinformatieobject"):
-                key = mapper(key, type="objectinformatieobject")
+            if object_type is None:
+                if mapper(key):
+                    key = mapper(key)
+                elif mapper(key, type="connection"):
+                    key = mapper(key, type="connection")
+                elif mapper(key, type="gebruiksrechten"):
+                    key = mapper(key, type="gebruiksrechten")
+                elif mapper(key, type="oio"):
+                    key = mapper(key, type="oio")
+            else:
+                key = mapper(key, type=object_type)
 
             if value and value in ["NULL", "NOT NULL"]:
                 filter_string += f"{key} IS {value} AND "

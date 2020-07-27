@@ -50,7 +50,8 @@ class SOAPCMISRequest:
     def base_url(self):
         """Return the base URL
 
-        For example, for Alfresco running locally the base URL for SOAP requests is http://localhost:8082/alfresco/cmisws
+        For example, for Alfresco running locally the base URL for SOAP requests is
+        http://localhost:8082/alfresco/cmisws
         """
         return self.config.client_url
 
@@ -99,8 +100,10 @@ class SOAPCMISRequest:
         """Make request with MTOM attachment.
 
         :param path: string, path where to post the request
-        :param soap_envelope: string, XML which can contain zero or more references to attachments (in the form of `cid:<contentId>`)
-        :param attachments: list of tuples, each tuple contains the content ID used in the XML (string) and the I/O stream for the attachment.
+        :param soap_envelope: string, XML which can contain zero or more references to attachments
+        (in the form of `cid:<contentId>`)
+        :param attachments: list of tuples, each tuple contains the content ID used in the XML (string) and the I/O
+        stream for the attachment.
         :return: string, the content of the response
         """
         url = f"http://localhost:8082/alfresco/cmisws/{path.lstrip('/')}"

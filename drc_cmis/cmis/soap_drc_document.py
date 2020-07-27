@@ -3,16 +3,12 @@ import uuid
 from io import BytesIO
 from typing import List, Optional
 
-import requests
-
 from drc_cmis.client.exceptions import CmisRuntimeException
 from drc_cmis.client.mapper import (
     CONNECTION_MAP,
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,
-    REVERSE_CONNECTION_MAP,
-    REVERSE_DOCUMENT_MAP,
     mapper,
 )
 from drc_cmis.client.query import CMISQuery
@@ -51,7 +47,7 @@ class CMISBaseObject(SOAPCMISRequest):
             return self.properties[convert_name]["value"]
 
         convert_name = f"drc:{name}"
-        if name in self.name_map:
+        if self.name_map is not None and name in self.name_map:
             convert_name = self.name_map.get(name)
         elif name in CONNECTION_MAP:
             convert_name = CONNECTION_MAP.get(name)
@@ -267,7 +263,7 @@ class Folder(CMISBaseObject):
     def get_children_folders(self) -> List:
         """Get all the folders in the current folder"""
 
-        query = CMISQuery(f"SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
+        query = CMISQuery("SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
 
         soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,

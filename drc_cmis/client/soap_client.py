@@ -19,6 +19,7 @@ from drc_cmis.client.exceptions import (
     DocumentLockConflictException,
     DocumentLockedException,
     DocumentNotLockedException,
+    FolderDoesNotExistError,
 )
 from drc_cmis.client.mapper import mapper
 from drc_cmis.client.query import CMISQuery
@@ -69,7 +70,7 @@ class SOAPCMISClient(SOAPCMISRequest):
     def base_folder(self) -> Folder:
 
         if self._base_folder is None:
-            query = CMISQuery(f"SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
+            query = CMISQuery("SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
 
             soap_envelope = make_soap_envelope(
                 repository_id=self.main_repo_id,
@@ -104,7 +105,9 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         return self._base_folder
 
-    def query(self, return_type, lhs: List[str], rhs: List[str]) -> List["return_type"]:
+    def query(
+        self, return_type, lhs: List[str], rhs: List[str]
+    ) -> List[Union[Document, Gebruiksrechten, ObjectInformatieObject]]:
         table = return_type.table
         where = (" WHERE " + " AND ".join(lhs)) if lhs else ""
         query = CMISQuery("SELECT * FROM %s%s" % (table, where))
@@ -164,12 +167,44 @@ class SOAPCMISClient(SOAPCMISRequest):
         extracted_data = extract_object_properties_from_xml(
             xml_response, "createFolder"
         )[0]
+
+        # Creating a folder only returns the objectId
+        folder_id = extracted_data["properties"]["objectId"]["value"]
+
+        return self.get_folder(folder_id)
+
+    def get_folder(self, object_id: str) -> Folder:
+        """Retrieve folder with given objectId"""
+
+        query = CMISQuery(
+            "SELECT * FROM cmis:folder WHERE cmis:objectId = 'workspace://SpacesStore/%s'"
+        )
+
+        soap_envelope = make_soap_envelope(
+            repository_id=self.main_repo_id,
+            statement=query(object_id),
+            cmis_action="query",
+        )
+
+        soap_response = self.request(
+            "DiscoveryService", soap_envelope=soap_envelope.toxml()
+        )
+        xml_response = extract_xml_from_soap(soap_response)
+        num_items = extract_num_items(xml_response)
+        if num_items == 0:
+            error_string = (
+                f"Folder met objectId {object_id} bestaat niet in het CMIS connection"
+            )
+            does_not_exist = FolderDoesNotExistError(error_string)
+            raise does_not_exist
+
+        extracted_data = extract_object_properties_from_xml(xml_response, "query")[0]
         return Folder(extracted_data)
 
     def delete_cmis_folders_in_base(self):
         self.base_folder.delete_tree()
 
-    # TODO Generalise so that it creates "Documents" too
+    # TODO Generalise so that it creates "Documents" too?
     def create_content_object(
         self, data: dict, object_type: str
     ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
@@ -237,64 +272,13 @@ class SOAPCMISClient(SOAPCMISRequest):
         elif object_type == "gebruiksrechten":
             return Gebruiksrechten(extracted_data)
 
-    def get_content_objects(self, object_type: str, filters: dict = None):
-        """Retrieve gebruiksrechten/oios based on the filters provided"""
-
-        assert object_type in [
-            "gebruiksrechten",
-            "oio",
-        ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
-
-        if filters.get("uuid") is not None:
-            results = [self.get_content_object(filters.get("uuid"), object_type)]
-            return {
-                "has_next": False,
-                "total_count": 1,
-                "has_prev": False,
-                "results": results,
-            }
-        else:
-            query = CMISQuery("SELECT * FROM drc:%s WHERE %s")
-
-            filter_string = build_query_filters(
-                filters, filter_string="AND ", strip_end=True
-            )
-
-            soap_envelope = make_soap_envelope(
-                repository_id=self.main_repo_id,
-                statement=query(object_type, filter_string),
-                cmis_action="query",
-            )
-
-            soap_response = self.request(
-                "DiscoveryService", soap_envelope=soap_envelope.toxml()
-            )
-            xml_response = extract_xml_from_soap(soap_response)
-            num_items = extract_num_items(xml_response)
-            if num_items == 0:
-                return []
-            else:
-                extracted_data = extract_object_properties_from_xml(
-                    xml_response, "query"
-                )
-                if object_type == "gebruiksrechten":
-                    return_type = Gebruiksrechten
-                elif object_type == "oio":
-                    return_type = ObjectInformatieObject
-
-                return {
-                    "has_next": False,
-                    "total_count": num_items,
-                    "has_prev": False,
-                    "results": [return_type(obj_data) for obj_data in extracted_data],
-                }
-
     def get_content_object(
         self, uuid: Union[str, UUID], object_type: str
     ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
         """Get the gebruiksrechten/oio with specified uuid
 
-        :param uuid: string or UUID, identifier that when combined with 'workspace://SpacesStore/' and the version number gives the cmis:objectId
+        :param uuid: string or UUID, identifier that when combined with 'workspace://SpacesStore/' and the version
+        number gives the cmis:objectId
         :param object_type: string, either "gebruiksrechten" or "oio"
         :return: Either a Gebruiksrechten or ObjectInformatieObject
         """
@@ -320,7 +304,8 @@ class SOAPCMISClient(SOAPCMISRequest):
         xml_response = extract_xml_from_soap(soap_response)
         num_items = extract_num_items(xml_response)
 
-        error_string = f"{object_type.capitalize()} document met identificatie {uuid} bestaat niet in het CMIS connection"
+        object_title = object_type.capitalize()
+        error_string = f"{object_title} document met identificatie {uuid} bestaat niet in het CMIS connection"
         does_not_exist = DocumentDoesNotExistError(error_string)
 
         if num_items == 0:
@@ -336,7 +321,8 @@ class SOAPCMISClient(SOAPCMISRequest):
     def delete_content_object(self, uuid: Union[str, UUID], object_type: str):
         """Delete the gebruiksrechten/objectinformatieobject with specified uuid
 
-        :param uuid: string or UUID, identifier that when combined with 'workspace://SpacesStore/' and the version number gives the cmis:objectId
+        :param uuid: string or UUID, identifier that when combined with 'workspace://SpacesStore/' and the version
+        number gives the cmis:objectId
         :param object_type: string, either "gebruiksrechten" or "oio"
         :return: Either a Gebruiksrechten or ObjectInformatieObject
         """
@@ -523,7 +509,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         """Query by identification if a document is in the repository"""
 
         query = CMISQuery(
-            f"SELECT * FROM drc:document WHERE drc:document__identificatie = '%s'"
+            "SELECT * FROM drc:document WHERE drc:document__identificatie = '%s'"
         )
 
         soap_envelope = make_soap_envelope(

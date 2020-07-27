@@ -3,6 +3,10 @@ class DMSException(Exception):
         self.message = message
 
 
+class FolderDoesNotExistError(DMSException):
+    pass
+
+
 class DocumentExistsError(DMSException):
     pass
 
