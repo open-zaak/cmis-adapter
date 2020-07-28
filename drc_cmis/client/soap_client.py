@@ -35,6 +35,7 @@ from drc_cmis.cmis.utils import (
     build_query_filters,
     extract_num_items,
     extract_object_properties_from_xml,
+    extract_repo_info_from_xml,
     extract_xml_from_soap,
     make_soap_envelope,
 )
@@ -104,6 +105,18 @@ class SOAPCMISClient(SOAPCMISRequest):
                 )
 
         return self._base_folder
+
+    def get_repository_info(self) -> dict:
+        soap_envelope = make_soap_envelope(
+            repository_id=self.main_repo_id, cmis_action="getRepositoryInfo",
+        )
+
+        soap_response = self.request(
+            "RepositoryService", soap_envelope=soap_envelope.toxml()
+        )
+
+        xml_response = extract_xml_from_soap(soap_response)
+        return extract_repo_info_from_xml(xml_response)
 
     def query(
         self, return_type, lhs: List[str], rhs: List[str]

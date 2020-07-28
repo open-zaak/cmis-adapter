@@ -42,6 +42,28 @@ class CMISSOAPClientTests(DMSSOAPMixin, TestCase):
         self.assertIsInstance(base_folder, Folder)
         self.assertEqual(base_folder.name, self.cmis_client.base_folder_name)
 
+    def test_get_repository_info(self):
+        properties = self.cmis_client.get_repository_info()
+
+        expected_properties = [
+            "repositoryId",
+            "repositoryName",
+            "repositoryDescription",
+            "vendorName",
+            "productName",
+            "productVersion",
+            "rootFolderId",
+            "latestChangeLogToken",
+            "cmisVersionSupported",
+            "changesIncomplete",
+            "changesOnType",
+            "principalAnonymous",
+            "principalAnyone",
+        ]
+
+        for expected_property in expected_properties:
+            self.assertIn(expected_property, properties)
+
     # TODO
     def test_query(self):
         pass

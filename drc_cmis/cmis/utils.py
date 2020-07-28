@@ -260,6 +260,21 @@ def extract_root_folder_id_from_xml(xml_data: str) -> str:
     return folder_id_node.firstChild.nodeValue
 
 
+def extract_repo_info_from_xml(xml_data: str) -> dict:
+    parsed_xml = minidom.parseString(xml_data)
+
+    properties = {}
+
+    for info_node in parsed_xml.getElementsByTagName("repositoryInfo"):
+        for property_node in info_node.childNodes:
+            property_name = property_node.nodeName.lstrip("ns2:")
+            property_value = property_node.firstChild.nodeValue
+            if property_value is not None:
+                properties[property_name] = property_value
+
+    return properties
+
+
 def extract_num_items(xml_data: str) -> int:
     """Extract the number of items in the SOAP XML returned by a query"""
     parsed_xml = minidom.parseString(xml_data)
@@ -511,7 +526,6 @@ def build_query_filters(
 
 # FIXME Use the actual mapper
 property_name_type_map = {
-    "cmis:contentStreamLength": "ns1:property",
     "cmis:versionLabel": "ns1:propertyDecimal",
     "cmis:objectTypeId": "ns1:propertyId",
     "cmis:name": "ns1:propertyString",
