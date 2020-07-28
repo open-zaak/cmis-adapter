@@ -323,7 +323,7 @@ def make_soap_envelope(
     content_id: Optional[str] = None,
     major: Optional[str] = None,
     checkin_comment: Optional[str] = None,
-):
+) -> minidom.Document:
 
     xml_doc = minidom.Document()
 
@@ -399,14 +399,12 @@ def make_soap_envelope(
     # All the properties
     if properties is not None:
         properties_element = xml_doc.createElement("ns:properties")
-        for prop_name, prop_value in properties.items():
-            prop_type = property_name_type_map.get(prop_name)
-
-            property_element = xml_doc.createElement(prop_type)
+        for prop_name, prop_dict in properties.items():
+            property_element = xml_doc.createElement(f"ns1:{prop_dict['type']}")
             property_element.setAttribute("propertyDefinitionId", prop_name)
 
             value_element = xml_doc.createElement("ns1:value")
-            value_text = xml_doc.createTextNode(prop_value)
+            value_text = xml_doc.createTextNode(prop_dict["value"])
             value_element.appendChild(value_text)
             property_element.appendChild(value_element)
 
@@ -522,44 +520,3 @@ def build_query_filters(
         filter_string = filter_string[:-4]
 
     return filter_string
-
-
-# FIXME Use the actual mapper
-property_name_type_map = {
-    "cmis:versionLabel": "ns1:propertyDecimal",
-    "cmis:objectTypeId": "ns1:propertyId",
-    "cmis:name": "ns1:propertyString",
-    "drc:document__integriteitwaarde": "ns1:propertyString",
-    "drc:document__titel": "ns1:propertyString",
-    "drc:document__bestandsnaam": "ns1:propertyString",
-    "drc:document__formaat": "ns1:propertyString",
-    "drc:document__ondertekeningsoort": "ns1:propertyString",
-    "drc:document__beschrijving": "ns1:propertyString",
-    "drc:document__identificatie": "ns1:propertyString",
-    "drc:document__verzenddatum": "ns1:propertyDateTime",
-    "drc:document__taal": "ns1:propertyString",
-    "drc:document__indicatiegebruiksrecht": "ns1:propertyString",
-    "drc:document__verwijderd": "ns1:propertyBoolean",
-    "drc:document__status": "ns1:propertyString",
-    "drc:document__ontvangstdatum": "ns1:propertyDateTime",
-    "drc:document__informatieobjecttype": "ns1:propertyString",
-    "drc:document__auteur": "ns1:propertyString",
-    "drc:document__vertrouwelijkaanduiding": "ns1:propertyString",
-    "drc:document__integriteitalgoritme": "ns1:propertyString",
-    "drc:document__begin_registratie": "ns1:propertyDateTime",
-    "drc:document__ondertekeningdatum": "ns1:propertyDateTime",
-    "drc:document__bronorganisatie": "ns1:propertyString",
-    "drc:document__integriteitdatum": "ns1:propertyDateTime",
-    "drc:document__link": "ns1:propertyString",
-    "drc:document__creatiedatum": "ns1:propertyDateTime",
-    "drc:document__versie": "ns1:propertyDecimal",
-    "drc:document__lock": "ns1:propertyString",
-    "drc:oio__object_type": "ns1:propertyString",
-    "drc:oio__besluit": "ns1:propertyString",
-    "drc:oio__zaak": "ns1:propertyString",
-    "drc:oio__informatieobject": "ns1:propertyString",
-    "drc:gebruiksrechten__einddatum": "ns1:propertyDateTime",
-    "drc:gebruiksrechten__omschrijving_voorwaarden": "ns1:propertyString",
-    "drc:gebruiksrechten__informatieobject": "ns1:propertyString",
-    "drc:gebruiksrechten__startdatum": "ns1:propertyDateTime",
-}

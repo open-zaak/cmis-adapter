@@ -21,6 +21,7 @@ from drc_cmis.cmis.utils import (
     extract_xml_from_soap,
     make_soap_envelope,
 )
+from drc_cmis.data.data_models import EnkelvoudigInformatieObject, get_cmis_type
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,20 @@ class Document(CMISContentObject):
     def build_properties(
         cls, data: dict, new: bool = True, identification: str = ""
     ) -> dict:
+        """Construct property dictionary.
+
+        The structure of the dictionary is (where ``property_name``, ``property_value``
+        and ``property_type`` are the name, value and type of the property):
+
+            .. code-block:: python
+
+                properties = {
+                    "property_name": {
+                        "value": property_value,
+                        "type": property_type,
+                    }
+                }
+        """
 
         props = {}
         for key, value in data.items():
@@ -88,21 +103,30 @@ class Document(CMISContentObject):
                 logger.debug("No property name found for key '%s'", key)
                 continue
             if value is not None:
-                props[prop_name] = str(value)
+                prop_type = get_cmis_type(EnkelvoudigInformatieObject, key)
+                props[prop_name] = {"value": str(value), "type": prop_type}
 
         if new:
-            props.setdefault("cmis:objectTypeId", cls.object_type_id)
+            object_type_id = {
+                "value": cls.object_type_id,
+                "type": get_cmis_type(EnkelvoudigInformatieObject, "object_type_id"),
+            }
+            props.setdefault("cmis:objectTypeId", object_type_id)
 
             # increase likelihood of uniqueness of title by appending a random string
             title, suffix = data.get("titel"), get_random_string()
             if title is not None:
-                props["cmis:name"] = f"{title}-{suffix}"
+                props["cmis:name"] = {
+                    "value": f"{title}-{suffix}",
+                    "type": get_cmis_type(EnkelvoudigInformatieObject, "name"),
+                }
 
             # make sure the identification is set, but _only_ for newly created documents.
             # identificatie is immutable once the document is created
             if identification:
                 prop_name = mapper("identificatie")
-                props[prop_name] = str(identification)
+                prop_type = get_cmis_type(EnkelvoudigInformatieObject, "identificatie")
+                props[prop_name] = {"value": str(identification), "type": prop_type}
 
         # can't or shouldn't be written
         props.pop(mapper("uuid"), None)

@@ -39,6 +39,12 @@ from drc_cmis.cmis.utils import (
     extract_xml_from_soap,
     make_soap_envelope,
 )
+from drc_cmis.data.data_models import (
+    EnkelvoudigInformatieObject,
+    Gebruiksrechten as GebruiksRechtDoc,
+    Oio,
+    get_cmis_type,
+)
 
 
 class CMISClientException(ValidationError):
@@ -163,7 +169,10 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         object_type_id = CmisId("cmis:folder")
 
-        properties = {"cmis:objectTypeId": object_type_id, "cmis:name": name}
+        properties = {
+            "cmis:objectTypeId": {"value": object_type_id, "type": "propertyId"},
+            "cmis:name": {"value": name, "type": "propertyString"},
+        }
 
         soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
@@ -232,20 +241,32 @@ class SOAPCMISClient(SOAPCMISRequest):
             "oio",
         ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
 
+        if object_type == "oio":
+            return_type = ObjectInformatieObject
+            data_class = Oio
+        elif object_type == "gebruiksrechten":
+            return_type = Gebruiksrechten
+            data_class = GebruiksRechtDoc
+
         now = datetime.datetime.now()
         year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
         month_folder = self.get_or_create_folder(str(now.month), year_folder)
         day_folder = self.get_or_create_folder(str(now.day), month_folder)
         object_folder = self.get_or_create_folder(object_type.capitalize(), day_folder)
 
-        properties = {
-            mapper(key, type=object_type): value
-            for key, value in data.items()
-            if mapper(key, type=object_type)
-        }
+        properties = {}
+        for key, value in data.items():
+            if mapper(key, type=object_type):
+                prop_type = get_cmis_type(data_class, key)
+                prop_name = mapper(key, type=object_type)
+                properties[prop_name] = {"value": value, "type": prop_type}
 
-        properties.setdefault("cmis:objectTypeId", f"D:drc:{object_type}")
-        properties.setdefault("cmis:name", get_random_string())
+        properties.setdefault(
+            "cmis:objectTypeId", {"value": f"D:drc:{object_type}", "type": "propertyId"}
+        )
+        properties.setdefault(
+            "cmis:name", {"value": get_random_string(), "type": "propertyString"}
+        )
 
         soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
@@ -280,10 +301,7 @@ class SOAPCMISClient(SOAPCMISRequest):
             0
         ]
 
-        if object_type == "oio":
-            return ObjectInformatieObject(extracted_data)
-        elif object_type == "gebruiksrechten":
-            return Gebruiksrechten(extracted_data)
+        return return_type(extracted_data)
 
     def get_content_object(
         self, uuid: Union[str, UUID], object_type: str
@@ -405,7 +423,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         return Document(extracted_data)
 
     def lock_document(self, uuid: str, lock: str):
-        """Lock a document with objectId workspace://SpacesStore/<uuid>"""
+        """Lock a EnkelvoudigInformatieObject with objectId workspace://SpacesStore/<uuid>"""
         cmis_doc = self.get_document(uuid)
 
         already_locked = DocumentLockedException(
@@ -421,7 +439,13 @@ class SOAPCMISClient(SOAPCMISRequest):
                 raise already_locked
 
             # store the lock value on the PWC so we can compare it later
-            pwc.update_properties({mapper("lock"): lock})
+            lock_property = {
+                mapper("lock"): {
+                    "value": lock,
+                    "type": get_cmis_type(EnkelvoudigInformatieObject, "lock"),
+                }
+            }
+            pwc.update_properties(lock_property)
         except CmisUpdateConflictException as exc:
             raise already_locked from exc
 
@@ -431,7 +455,13 @@ class SOAPCMISClient(SOAPCMISRequest):
         pwc = cmis_doc.get_private_working_copy()
 
         if constant_time_compare(pwc.lock, lock) or force:
-            pwc.update_properties({mapper("lock"): ""})
+            lock_property = {
+                mapper("lock"): {
+                    "value": "",
+                    "type": get_cmis_type(EnkelvoudigInformatieObject, "lock"),
+                }
+            }
+            pwc.update_properties(lock_property)
             return pwc.checkin("Updated via Documenten API")
 
         raise CMISClientException(
