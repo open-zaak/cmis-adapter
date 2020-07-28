@@ -1,7 +1,7 @@
 import logging
 import uuid
 from io import BytesIO
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from drc_cmis.client.exceptions import CmisRuntimeException
 from drc_cmis.client.mapper import (
@@ -171,7 +171,7 @@ class Document(CMISContentObject):
 
         return self.get_document(doc_id)
 
-    def get_private_working_copy(self):
+    def get_private_working_copy(self) -> Union["Document", None]:
         """Get the version of the document with version label 'pwc'"""
         object_id = self.objectId.split(";")[0]
         soap_envelope = make_soap_envelope(

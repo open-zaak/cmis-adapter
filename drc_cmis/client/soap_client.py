@@ -392,6 +392,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         return Document(extracted_data)
 
     def lock_document(self, uuid: str, lock: str):
+        """Lock a document with objectId workspace://SpacesStore/<uuid>"""
         cmis_doc = self.get_document(uuid)
 
         already_locked = DocumentLockedException(
@@ -411,7 +412,8 @@ class SOAPCMISClient(SOAPCMISRequest):
         except CmisUpdateConflictException as exc:
             raise already_locked from exc
 
-    def unlock_document(self, uuid: str, lock: str, force: bool = False):
+    def unlock_document(self, uuid: str, lock: str, force: bool = False) -> Document:
+        """Unlock a document with objectId workspace://SpacesStore/<uuid>"""
         cmis_doc = self.get_document(uuid)
         pwc = cmis_doc.get_private_working_copy()
 
@@ -425,7 +427,7 @@ class SOAPCMISClient(SOAPCMISRequest):
 
     def update_document(
         self, uuid: str, lock: str, data: dict, content: Optional[BytesIO] = None
-    ):
+    ) -> Document:
 
         cmis_doc = self.get_document(uuid)
 
@@ -469,11 +471,9 @@ class SOAPCMISClient(SOAPCMISRequest):
     def get_document(
         self, uuid: Optional[str] = None, filters: Optional[dict] = None
     ) -> Document:
-        """Retrieve a document in the main repository"""
+        """Retrieve a document in the main repository with objectId workspace://SpacesStore/<uuid>"""
 
-        error_string = (
-            f"Document met identificatie {uuid} bestaat niet in het CMIS connection"
-        )
+        error_string = f"Document met objectId workspace://SpacesStore/{uuid} bestaat niet in het CMIS connection"
         does_not_exist = DocumentDoesNotExistError(error_string)
 
         if uuid is None:
