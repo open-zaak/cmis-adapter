@@ -161,7 +161,7 @@ class Document(CMISContentObject):
             object_id=str(self.objectId),
         )
 
-        # FIXME temporary solution due to alfresco problem
+        # FIXME temporary solution due to alfresco raising a 500 AFTER locking the document
         try:
             soap_response = self.request(
                 "VersioningService", soap_envelope=soap_envelope.toxml()
@@ -195,8 +195,7 @@ class Document(CMISContentObject):
 
         return self.get_document(doc_id)
 
-    def get_private_working_copy(self) -> Union["Document", None]:
-        """Get the version of the document with version label 'pwc'"""
+    def get_all_versions(self) -> List["Document"]:
         object_id = self.objectId.split(";")[0]
         soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
@@ -210,7 +209,12 @@ class Document(CMISContentObject):
         extracted_data = extract_object_properties_from_xml(
             xml_response, "getAllVersions"
         )
-        documents = [Document(data) for data in extracted_data]
+        return [Document(data) for data in extracted_data]
+
+    def get_private_working_copy(self) -> Union["Document", None]:
+        """Get the version of the document with version label 'pwc'"""
+        documents = self.get_all_versions()
+
         for document in documents:
             if document.versionLabel == "pwc":
                 return document
