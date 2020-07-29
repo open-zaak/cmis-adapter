@@ -4,10 +4,18 @@ from solo.models import SingletonModel
 
 
 class CMISConfig(SingletonModel):
+    BINDING_CHOICES = [
+        ("BROWSER", "Browser binding (CMIS 1.1)"),
+        ("WEBSERVICE", "Web service binding (CMIS 1.0)"),
+    ]
+
     client_url = models.URLField(
         default="http://localhost:8082/alfresco/api/-default-/public/cmis/versions/1.1/browser",
         help_text="API URL for DMS. For example, for alfresco this can be "
         "http://domain_name:port_number/alfresco/api/-default-/public/cmis/versions/1.1/browser",
+    )
+    binding = models.CharField(
+        choices=BINDING_CHOICES, default="BROWSER", max_length=200,
     )
     client_user = models.CharField(
         max_length=200, default="admin", help_text="Username for logging into DMS"

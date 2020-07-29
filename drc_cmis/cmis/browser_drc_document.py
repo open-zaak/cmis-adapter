@@ -15,7 +15,7 @@ from drc_cmis.client.mapper import (
 )
 from drc_cmis.client.utils import get_random_string
 
-from .utils import CMISRequest
+from .browser_request import CMISRequest
 
 logger = logging.getLogger(__name__)
 

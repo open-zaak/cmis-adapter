@@ -10,13 +10,13 @@ from django.utils.crypto import constant_time_compare
 
 from cmislib.exceptions import UpdateConflictException
 
-from drc_cmis.cmis.drc_document import (
+from drc_cmis.cmis.browser_drc_document import (
     Document,
     Folder,
     Gebruiksrechten,
     ObjectInformatieObject,
 )
-from drc_cmis.cmis.utils import CMISRequest
+from drc_cmis.cmis.browser_request import CMISRequest
 
 from .exceptions import (
     DocumentConflictException,
@@ -64,7 +64,8 @@ class CMISDRCClient(CMISRequest):
         return self._base_folder
 
     # generic querying
-    def query(self, return_type, lhs: List[str], rhs: List[str]):
+    def query(self, return_type_name: str, lhs: List[str], rhs: List[str]):
+        return_type = self.get_return_type(return_type_name)
         table = return_type.table
         where = (" WHERE " + " AND ".join(lhs)) if lhs else ""
         query = CMISQuery("SELECT * FROM %s%s" % (table, where))
@@ -73,6 +74,27 @@ class CMISDRCClient(CMISRequest):
         response = self.post_request(self.base_url, body)
         logger.debug(response)
         return self.get_all_results(response, return_type)
+
+    def get_return_type(self, type_name: str) -> type:
+        error_message = f"No class {type_name} exists for this client."
+        assert type_name in [
+            "Folder",
+            "Document",
+            "Gebruiksrechten",
+            "Oio",
+        ], error_message
+
+        if type_name == "Folder":
+            return Folder
+        elif type_name == "Document":
+            return Document
+        elif type_name == "Gebruiksrechten":
+            return Gebruiksrechten
+        elif type_name == "Oio":
+            return ObjectInformatieObject
+
+    def get_all_versions(self, document: Document) -> List[Document]:
+        return document.get_all_versions(document)
 
     # ZRC Notification client calls.
     def get_or_create_zaaktype_folder(self, zaaktype):
@@ -234,7 +256,7 @@ class CMISDRCClient(CMISRequest):
         except GetFirstException as exc:
             raise does_not_exist from exc
 
-    def update_cmis_document(self, uuid: str, lock: str, data: dict, content=None):
+    def update_document(self, uuid: str, lock: str, data: dict, content=None):
         logger.debug("Updating document with UUID %s", uuid)
         cmis_doc = self.get_cmis_document(uuid)
 
@@ -304,7 +326,7 @@ class CMISDRCClient(CMISRequest):
         for child_folder in self._get_base_folder.get_children():
             child_folder.delete_tree()
 
-    def obliterate_document(self, uuid: str) -> None:
+    def delete_document(self, uuid: str) -> None:
         logger.debug("CMIS_CLIENT: obliterate_document")
         cmis_doc = self.get_cmis_document(uuid)
         cmis_doc.destroy()
@@ -328,7 +350,7 @@ class CMISDRCClient(CMISRequest):
         }
 
         return gebruiksrechten_folder.create_gebruiksrechten(
-            name=self.get_random_string(), properties=properties
+            name=get_random_string(), properties=properties
         )
 
     def get_all_cmis_gebruiksrechten(self):
@@ -420,14 +442,12 @@ class CMISDRCClient(CMISRequest):
         )
 
         properties = {
-            mapper(key, type="objectinformatieobject"): value
+            mapper(key, type="oio"): value
             for key, value in data.items()
-            if mapper(key, type="objectinformatieobject")
+            if mapper(key, type="oio")
         }
 
-        return oio_folder.create_oio(
-            name=self.get_random_string(), properties=properties
-        )
+        return oio_folder.create_oio(name=get_random_string(), properties=properties)
 
     def get_all_cmis_oio(self):
 

@@ -48,23 +48,7 @@ from drc_cmis.data.data_models import (
 
 
 class CMISClientException(ValidationError):
-    def __init__(
-        self,
-        detail,
-        create=False,
-        update=False,
-        retreive_single=False,
-        delete=False,
-        retreive_list=False,
-        code=None,
-    ):
-        self.create = create
-        self.update = update
-        self.retreive_single = retreive_single
-        self.delete = delete
-        self.retreive_list = retreive_list
-
-        super().__init__(detail, code)
+    pass
 
 
 class SOAPCMISClient(SOAPCMISRequest):
@@ -125,8 +109,9 @@ class SOAPCMISClient(SOAPCMISRequest):
         return extract_repo_info_from_xml(xml_response)
 
     def query(
-        self, return_type, lhs: List[str], rhs: List[str]
+        self, return_type_name: str, lhs: List[str], rhs: List[str]
     ) -> List[Union[Document, Gebruiksrechten, ObjectInformatieObject]]:
+        return_type = self.get_return_type(return_type_name)
         table = return_type.table
         where = (" WHERE " + " AND ".join(lhs)) if lhs else ""
         query = CMISQuery("SELECT * FROM %s%s" % (table, where))
@@ -142,6 +127,27 @@ class SOAPCMISClient(SOAPCMISRequest):
         extracted_data = extract_object_properties_from_xml(xml_response, "query")
 
         return [return_type(cmis_object) for cmis_object in extracted_data]
+
+    def get_return_type(self, type_name: str) -> type:
+        error_message = f"No class {type_name} exists for this client."
+        assert type_name in [
+            "Folder",
+            "Document",
+            "Gebruiksrechten",
+            "Oio",
+        ], error_message
+
+        if type_name == "Folder":
+            return Folder
+        elif type_name == "Document":
+            return Document
+        elif type_name == "Gebruiksrechten":
+            return Gebruiksrechten
+        elif type_name == "Oio":
+            return ObjectInformatieObject
+
+    def get_all_versions(self, document: Document) -> List[Document]:
+        return document.get_all_versions()
 
     def get_or_create_folder(self, name: str, parent: Folder) -> Folder:
         """Get or create a folder 'name/' in a folder with cmis:objectId `parent_id`
@@ -464,9 +470,7 @@ class SOAPCMISClient(SOAPCMISRequest):
             pwc.update_properties(lock_property)
             return pwc.checkin("Updated via Documenten API")
 
-        raise CMISClientException(
-            detail=_("Lock did not match"), update=True, code="unlock-failed"
-        )
+        raise CMISClientException(detail=_("Lock did not match"), code="unlock-failed")
 
     def update_document(
         self, uuid: str, lock: str, data: dict, content: Optional[BytesIO] = None
@@ -547,6 +551,11 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         extracted_data = extract_object_properties_from_xml(xml_response, "query")[0]
         return Document(extracted_data)
+
+    def delete_document(self, uuid: str) -> None:
+        """Delete all versions of a document with objectId workspace://SpacesStore/<uuid>"""
+        document = self.get_document(uuid=uuid)
+        document.delete_object()
 
     def check_document_exists(self, identification: Union[str, UUID]):
         """Query by identification if a document is in the repository"""

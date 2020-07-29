@@ -8,9 +8,9 @@ from django.utils.translation import ugettext_lazy as _
 from cmislib.exceptions import UpdateConflictException
 from rest_framework.exceptions import ValidationError
 
+from drc_cmis.client.browser_client import CMISDRCClient
 from drc_cmis.client.mapper import mapper
 
-from .client import CMISDRCClient
 from .client.convert import (
     make_enkelvoudiginformatieobject_dataclass,
     make_objectinformatieobject_dataclass,
@@ -191,9 +191,7 @@ class CMISDRCStorageBackend:
         """
         logger.debug(f"CMIS_BACKEND: update_document {uuid} start")
         try:
-            cmis_document = self.cmis_client.update_cmis_document(
-                uuid, lock, data, content
-            )
+            cmis_document = self.cmis_client.update_document(uuid, lock, data, content)
         except DocumentDoesNotExistError as e:
             raise self.exception_class({None: e.message}, update=True)
         except DocumentNotLockedException as e:
