@@ -5,11 +5,9 @@ from typing import List, Optional, Union
 from uuid import UUID
 
 from django.utils.crypto import constant_time_compare
-from django.utils.translation import ugettext_lazy as _
 
 from cmislib.domain import CmisId
 from cmislib.exceptions import UpdateConflictException
-from rest_framework.exceptions import ValidationError
 
 from drc_cmis.client.exceptions import (
     CmisUpdateConflictException,
@@ -20,6 +18,7 @@ from drc_cmis.client.exceptions import (
     DocumentLockedException,
     DocumentNotLockedException,
     FolderDoesNotExistError,
+    LockDidNotMatchException,
 )
 from drc_cmis.client.mapper import mapper
 from drc_cmis.client.query import CMISQuery
@@ -47,11 +46,8 @@ from drc_cmis.data.data_models import (
 )
 
 
-class CMISClientException(ValidationError):
-    pass
-
-
 class SOAPCMISClient(SOAPCMISRequest):
+    """CMIS client for Web service binding (CMIS 1.0)"""
 
     _main_repo_id = None
     _root_folder_id = None
@@ -59,6 +55,7 @@ class SOAPCMISClient(SOAPCMISRequest):
 
     @property
     def base_folder(self) -> Folder:
+        """Return the base folder"""
 
         if self._base_folder is None:
             query = CMISQuery("SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
@@ -111,6 +108,13 @@ class SOAPCMISClient(SOAPCMISRequest):
     def query(
         self, return_type_name: str, lhs: List[str], rhs: List[str]
     ) -> List[Union[Document, Gebruiksrechten, ObjectInformatieObject]]:
+        """Perform an SQL query in the DMS
+
+        :param return_type_name: string, either Folder, Document, Oio or Gebruiksrechten
+        :param lhs: list of strings, with the LHS of the SQL query
+        :param rhs: list of strings, with the RHS of the SQL query
+        :return: type, either Folder, Document, Oio or Gebruiksrechten
+        """
         return_type = self.get_return_type(return_type_name)
         table = return_type.table
         where = (" WHERE " + " AND ".join(lhs)) if lhs else ""
@@ -129,6 +133,11 @@ class SOAPCMISClient(SOAPCMISRequest):
         return [return_type(cmis_object) for cmis_object in extracted_data]
 
     def get_return_type(self, type_name: str) -> type:
+        """Return the class corresponding to the name given
+
+        :param type_name: string, either Folder, Document, Oio or Gebruiksrechten
+        :return: type, string, either Folder, Document, Oio or Gebruiksrechten
+        """
         error_message = f"No class {type_name} exists for this client."
         assert type_name in [
             "Folder",
@@ -147,14 +156,15 @@ class SOAPCMISClient(SOAPCMISRequest):
             return ObjectInformatieObject
 
     def get_all_versions(self, document: Document) -> List[Document]:
+        """Get all versions of a document from the CMS"""
         return document.get_all_versions()
 
     def get_or_create_folder(self, name: str, parent: Folder) -> Folder:
-        """Get or create a folder 'name/' in a folder with cmis:objectId `parent_id`
+        """Get or create a folder 'name/' in the parent folder
 
         :param name: string, the name of the folder to create
         :param parent: Folder, the parent folder
-        :return: the folder that was created
+        :return: Folder, the folder that was created/retrieved
         """
 
         children_folders = parent.get_children_folders()
@@ -201,17 +211,15 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         return self.get_folder(folder_id)
 
-    def get_folder(self, object_id: str) -> Folder:
-        """Retrieve folder with given objectId"""
+    def get_folder(self, uuid: str) -> Folder:
+        """Retrieve folder with objectId constructed with the uuid given"""
 
         query = CMISQuery(
             "SELECT * FROM cmis:folder WHERE cmis:objectId = 'workspace://SpacesStore/%s'"
         )
 
         soap_envelope = make_soap_envelope(
-            repository_id=self.main_repo_id,
-            statement=query(object_id),
-            cmis_action="query",
+            repository_id=self.main_repo_id, statement=query(uuid), cmis_action="query",
         )
 
         soap_response = self.request(
@@ -220,9 +228,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         xml_response = extract_xml_from_soap(soap_response)
         num_items = extract_num_items(xml_response)
         if num_items == 0:
-            error_string = (
-                f"Folder met objectId {object_id} bestaat niet in het CMIS connection"
-            )
+            error_string = f"Folder met objectId 'workspace://SpacesStore/{uuid}' bestaat niet in het CMIS connection"
             does_not_exist = FolderDoesNotExistError(error_string)
             raise does_not_exist
 
@@ -230,6 +236,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         return Folder(extracted_data)
 
     def delete_cmis_folders_in_base(self):
+        """Deletest the base folder and all its contents"""
         self.base_folder.delete_tree()
 
     # TODO Generalise so that it creates "Documents" too?
@@ -370,6 +377,13 @@ class SOAPCMISClient(SOAPCMISRequest):
     def create_document(
         self, identification: str, data: dict, content: BytesIO = None
     ) -> Document:
+        """Create a custom Document (with the EnkelvoudigInformatieObject properties)
+
+        :param identification: string, the document ``identificatie``
+        :param data: dict, the properties of the document
+        :param content: BytesIO, the content of the document
+        :return: Document, the document created
+        """
 
         self.check_document_exists(identification)
 
@@ -429,7 +443,11 @@ class SOAPCMISClient(SOAPCMISRequest):
         return Document(extracted_data)
 
     def lock_document(self, uuid: str, lock: str):
-        """Lock a EnkelvoudigInformatieObject with objectId workspace://SpacesStore/<uuid>"""
+        """Lock a EnkelvoudigInformatieObject with objectId workspace://SpacesStore/<uuid>
+
+        :param uuid: string, uuid used to create the objectId
+        :param lock: string, value of the lock
+        """
         cmis_doc = self.get_document(uuid)
 
         already_locked = DocumentLockedException(
@@ -456,7 +474,13 @@ class SOAPCMISClient(SOAPCMISRequest):
             raise already_locked from exc
 
     def unlock_document(self, uuid: str, lock: str, force: bool = False) -> Document:
-        """Unlock a document with objectId workspace://SpacesStore/<uuid>"""
+        """Unlock a document with objectId workspace://SpacesStore/<uuid>
+
+        :param uuid: string, uuid used to create the objectId
+        :param lock: string, value of the lock
+        :param force: bool, whether to force the unlocking
+        :return: Document, the unlocked document
+        """
         cmis_doc = self.get_document(uuid)
         pwc = cmis_doc.get_private_working_copy()
 
@@ -470,12 +494,19 @@ class SOAPCMISClient(SOAPCMISRequest):
             pwc.update_properties(lock_property)
             return pwc.checkin("Updated via Documenten API")
 
-        raise CMISClientException(detail=_("Lock did not match"), code="unlock-failed")
+        raise LockDidNotMatchException("Lock did not match", code="unlock-failed")
 
     def update_document(
         self, uuid: str, lock: str, data: dict, content: Optional[BytesIO] = None
     ) -> Document:
+        """Update a Document (with the EnkelvoudigInformatieObject properties)
 
+        :param uuid: string, the uuid that combined with workspace://SpacesStore/<uuid> gives the objectId
+        :param lock: string, value of the lock
+        :param data: dict, the new properties of the document
+        :param content: BytesIO, the new content of the document
+        :return: Document, the updated document
+        """
         cmis_doc = self.get_document(uuid)
 
         if not cmis_doc.isVersionSeriesCheckedOut:
@@ -515,11 +546,13 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         return pwc
 
-    def get_document(
-        self, uuid: Optional[str] = None, filters: Optional[dict] = None
-    ) -> Document:
-        """Retrieve a document in the main repository with objectId workspace://SpacesStore/<uuid>"""
+    def get_document(self, uuid: str, filters: Optional[dict] = None) -> Document:
+        """Retrieve a document in the main repository with objectId workspace://SpacesStore/<uuid>
 
+        :param uuid: string, uuid used to create the objectId
+        :param filters: dict, filters to find the document
+        :return: Document, the first document found
+        """
         error_string = f"Document met objectId workspace://SpacesStore/{uuid} bestaat niet in het CMIS connection"
         does_not_exist = DocumentDoesNotExistError(error_string)
 
@@ -553,13 +586,18 @@ class SOAPCMISClient(SOAPCMISRequest):
         return Document(extracted_data)
 
     def delete_document(self, uuid: str) -> None:
-        """Delete all versions of a document with objectId workspace://SpacesStore/<uuid>"""
+        """Delete all versions of a document with objectId workspace://SpacesStore/<uuid>
+
+        :param uuid: string, uuid used to create the objectId
+        """
         document = self.get_document(uuid=uuid)
         document.delete_object()
 
     def check_document_exists(self, identification: Union[str, UUID]):
-        """Query by identification if a document is in the repository"""
+        """Query by identification if a document is in the repository
 
+        :param identification: string, document ``identificatie``
+        """
         query = CMISQuery(
             "SELECT * FROM drc:document WHERE drc:document__identificatie = '%s'"
         )

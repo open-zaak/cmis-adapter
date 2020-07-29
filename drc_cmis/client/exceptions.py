@@ -31,6 +31,10 @@ class DocumentLockedException(DMSException):
     pass
 
 
+class LockDidNotMatchException(DMSException):
+    pass
+
+
 class GetFirstException(Exception):
     pass
 

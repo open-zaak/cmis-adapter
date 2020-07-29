@@ -134,6 +134,11 @@ class Document(CMISContentObject):
         return props
 
     def get_document(self, object_id: str) -> "Document":
+        """Get latest version of a document with specified objectId
+
+        :param object_id: string, objectId of the document
+        :return: Document
+        """
         soap_envelope = make_soap_envelope(
             repository_id=self.main_repo_id,
             object_id=object_id,

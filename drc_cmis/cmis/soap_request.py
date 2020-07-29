@@ -106,7 +106,7 @@ class SOAPCMISRequest:
         stream for the attachment.
         :return: string, the content of the response
         """
-        url = f"http://localhost:8082/alfresco/cmisws/{path.lstrip('/')}"
+        url = f"{self.base_url}/{path.lstrip('/')}"
 
         envelope_header = ""
         for key, value in self._envelope_headers.items():
