@@ -272,6 +272,11 @@ class SOAPCMISClient(SOAPCMISRequest):
             if mapper(key, type=object_type):
                 prop_type = get_cmis_type(data_class, key)
                 prop_name = mapper(key, type=object_type)
+                if prop_type == "propertyDateTime":
+                    if isinstance(value, datetime.datetime) or isinstance(
+                        value, datetime.date
+                    ):
+                        value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
                 properties[prop_name] = {"value": value, "type": prop_type}
 
         properties.setdefault(

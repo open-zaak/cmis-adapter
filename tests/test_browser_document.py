@@ -21,9 +21,9 @@ class CMISBrowserDocumentTests(BrowserTestCase, TestCase):
         properties = {
             "integriteitwaarde": "Something",
             "verwijderd": "false",
-            "ontvangstdatum": timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+            "ontvangstdatum": datetime.date(2020, 7, 27),
             "versie": 1,
-            "creatiedatum": timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
 
@@ -45,7 +45,7 @@ class CMISBrowserDocumentTests(BrowserTestCase, TestCase):
     def test_checkout_document(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -59,7 +59,7 @@ class CMISBrowserDocumentTests(BrowserTestCase, TestCase):
     def test_checkin_document(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -75,7 +75,7 @@ class CMISBrowserDocumentTests(BrowserTestCase, TestCase):
     def test_get_pwc(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -90,7 +90,7 @@ class CMISBrowserDocumentTests(BrowserTestCase, TestCase):
     def test_get_pwc_with_no_checked_out_doc(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -113,8 +113,7 @@ class CMISBrowserDocumentTests(BrowserTestCase, TestCase):
             identification=identification, data=data, content=content
         )
         self.assertEqual(
-            datetime.datetime.utcfromtimestamp(document.creatiedatum / 1000).date(),
-            datetime.date(2020, 7, 27),
+            document.creatiedatum.date(), datetime.date(2020, 7, 27),
         )
         self.assertEqual(document.titel, "detailed summary")
         self.assertEqual(document.link, "http://a.link")
@@ -141,7 +140,7 @@ class CMISBrowserDocumentTests(BrowserTestCase, TestCase):
     def test_get_content_stream(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         content = io.BytesIO(b"Some very important content")
@@ -155,7 +154,7 @@ class CMISBrowserDocumentTests(BrowserTestCase, TestCase):
     def test_set_content_stream(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         content = io.BytesIO(b"Some very important content")
@@ -182,7 +181,7 @@ class CMISBrowserDocumentTests(BrowserTestCase, TestCase):
     def test_get_all_versions(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": timezone.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         content = io.BytesIO(b"Some very important content")

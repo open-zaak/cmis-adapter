@@ -1,3 +1,4 @@
+import datetime
 import logging
 import uuid
 from io import BytesIO
@@ -104,6 +105,8 @@ class Document(CMISContentObject):
                 continue
             if value is not None:
                 prop_type = get_cmis_type(EnkelvoudigInformatieObject, key)
+                if isinstance(value, datetime.date) or isinstance(value, datetime.date):
+                    value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
                 props[prop_name] = {"value": str(value), "type": prop_type}
 
         if new:

@@ -179,7 +179,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
     def test_create_gebruiksrechten(self):
         properties = {
             "informatieobject": "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
-            "startdatum": "2020-12-24T00:00:00Z",
+            "startdatum": datetime.datetime(2020, 7, 27),
             "omschrijving_voorwaarden": "Een hele set onredelijke voorwaarden",
         }
 
@@ -191,8 +191,8 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
             gebruiksrechten.informatieobject, properties["informatieobject"]
         )
         self.assertEqual(
-            gebruiksrechten.startdatum,
-            datetime.datetime.strptime(properties["startdatum"], "%Y-%m-%dT%H:%M:%S%z"),
+            gebruiksrechten.startdatum.strftime("%Y-%m-%d"),
+            properties["startdatum"].strftime("%Y-%m-%d"),
         )
         self.assertEqual(
             gebruiksrechten.omschrijving_voorwaarden,
@@ -235,7 +235,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
     def test_get_existing_gebruiksrechten(self):
         properties = {
             "informatieobject": "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
-            "startdatum": "2020-12-24T00:00:00Z",
+            "startdatum": datetime.datetime(2020, 7, 27),
             "omschrijving_voorwaarden": "Een hele set onredelijke voorwaarden",
         }
 
@@ -299,7 +299,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
         identification = str(uuid.uuid4())
         properties = {
             "bronorganisatie": "159351741",
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.datetime(2020, 7, 27),
             "titel": "detailed summary",
             "auteur": "test_auteur",
             "formaat": "txt",
@@ -317,7 +317,10 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
         self.assertEqual(document.identificatie, identification)
         self.assertEqual(document.bronorganisatie, "159351741")
-        self.assertEqual(document.creatiedatum.strftime("%Y-%m-%d"), "2018-06-27")
+        self.assertEqual(
+            document.creatiedatum.strftime("%Y-%m-%d"),
+            properties["creatiedatum"].strftime("%Y-%m-%d"),
+        )
         self.assertEqual(document.titel, "detailed summary")
         self.assertEqual(document.auteur, "test_auteur")
         self.assertEqual(document.formaat, "txt")
@@ -339,7 +342,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
     def test_create_existing_document_raises_error(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.datetime(2020, 7, 27),
             "titel": "detailed summary",
         }
         self.cmis_client.create_document(identification=identification, data=data)
@@ -353,7 +356,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
         self.assertEqual(len(children), 0)
 
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.datetime(2020, 7, 27),
             "titel": "detailed summary",
         }
         identification = str(uuid.uuid4())
@@ -379,7 +382,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
     def test_lock_document(self):
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.datetime(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -396,7 +399,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
     def test_already_locked_document(self):
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.datetime(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -412,7 +415,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
     def test_unlock_document(self):
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.datetime(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -431,7 +434,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
     def test_unlock_document_with_wrong_lock(self):
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.datetime(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -447,7 +450,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
     def test_force_unlock(self):
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.datetime(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -470,7 +473,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
         identification = str(uuid.uuid4())
         properties = {
             "bronorganisatie": "159351741",
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.datetime(2020, 7, 27),
             "titel": "detailed summary",
             "auteur": "test_auteur",
             "formaat": "txt",
@@ -503,7 +506,10 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
         self.assertEqual(updated_doc.identificatie, identification)
         self.assertEqual(updated_doc.bronorganisatie, "159351741")
-        self.assertEqual(updated_doc.creatiedatum.strftime("%Y-%m-%d"), "2018-06-27")
+        self.assertEqual(
+            updated_doc.creatiedatum.strftime("%Y-%m-%d"),
+            properties["creatiedatum"].strftime("%Y-%m-%d"),
+        )
         self.assertEqual(updated_doc.titel, "detailed summary")
         self.assertEqual(updated_doc.auteur, "updated auteur")
         self.assertEqual(updated_doc.formaat, "txt")

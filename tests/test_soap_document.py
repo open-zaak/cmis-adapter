@@ -1,3 +1,4 @@
+import datetime
 import io
 import uuid
 
@@ -45,13 +46,13 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
 
             if prop_name.split("__")[-1] in properties:
                 converted_prop_name = prop_name.split("__")[-1]
-                self.assertEqual(properties[converted_prop_name], prop_dict["value"])
                 self.assertEqual(types[converted_prop_name], prop_dict["type"])
+                self.assertEqual(properties[converted_prop_name], prop_dict["value"])
 
     def test_checkout_document(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -65,7 +66,7 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
     def test_checkin_document(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -81,7 +82,7 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
     def test_get_pwc(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -96,7 +97,7 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
     def test_get_pwc_with_no_checked_out_doc(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         document = self.cmis_client.create_document(
@@ -110,7 +111,7 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
     def test_update_properties(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
             "link": "http://a.link",
         }
@@ -118,7 +119,10 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
         document = self.cmis_client.create_document(
             identification=identification, data=data, content=content
         )
-        self.assertEqual(document.creatiedatum.strftime("%Y-%m-%d"), "2018-06-27")
+        self.assertEqual(
+            document.creatiedatum.strftime("%Y-%m-%d"),
+            datetime.date(2020, 7, 27).strftime("%Y-%m-%d"),
+        )
         self.assertEqual(document.titel, "detailed summary")
         self.assertEqual(document.link, "http://a.link")
         self.assertEqual(document.versionLabel, "1.0")
@@ -144,7 +148,7 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
     def test_get_content_stream(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         content = io.BytesIO(b"Some very important content")
@@ -158,7 +162,7 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
     def test_set_content_stream(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         content = io.BytesIO(b"Some very important content")
@@ -184,7 +188,7 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
     def test_get_all_versions(self):
         identification = str(uuid.uuid4())
         data = {
-            "creatiedatum": "2018-06-27",
+            "creatiedatum": datetime.date(2020, 7, 27),
             "titel": "detailed summary",
         }
         content = io.BytesIO(b"Some very important content")

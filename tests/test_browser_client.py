@@ -169,10 +169,7 @@ class CMISBrowserClientTests(BrowserTestCase, TestCase):
             gebruiksrechten.informatieobject, properties["informatieobject"]
         )
         self.assertEqual(
-            datetime.datetime.utcfromtimestamp(
-                gebruiksrechten.startdatum / 1000
-            ).date(),
-            datetime.date(2020, 7, 27),
+            gebruiksrechten.startdatum, datetime.datetime(2020, 7, 27),
         )
         self.assertEqual(
             gebruiksrechten.omschrijving_voorwaarden,
@@ -298,8 +295,7 @@ class CMISBrowserClientTests(BrowserTestCase, TestCase):
         self.assertEqual(document.identificatie, identification)
         self.assertEqual(document.bronorganisatie, "159351741")
         self.assertEqual(
-            datetime.datetime.utcfromtimestamp(document.creatiedatum / 1000).date(),
-            datetime.date(2020, 7, 27),
+            document.creatiedatum.date(), datetime.date(2020, 7, 27),
         )
         self.assertEqual(document.titel, "detailed summary")
         self.assertEqual(document.auteur, "test_auteur")
@@ -487,8 +483,7 @@ class CMISBrowserClientTests(BrowserTestCase, TestCase):
         self.assertEqual(updated_doc.identificatie, identification)
         self.assertEqual(updated_doc.bronorganisatie, "159351741")
         self.assertEqual(
-            datetime.datetime.utcfromtimestamp(updated_doc.creatiedatum / 1000).date(),
-            datetime.date(2020, 7, 27),
+            updated_doc.creatiedatum.date(), datetime.date(2020, 7, 27),
         )
         self.assertEqual(updated_doc.titel, "detailed summary")
         self.assertEqual(updated_doc.auteur, "updated auteur")

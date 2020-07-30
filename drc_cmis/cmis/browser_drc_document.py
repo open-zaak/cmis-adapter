@@ -1,3 +1,4 @@
+import datetime
 import logging
 import mimetypes
 from datetime import date
@@ -24,7 +25,16 @@ class CMISBaseObject(CMISRequest):
     def __init__(self, data):
         super().__init__()
         self.data = data
-        self.properties = dict(data.get("properties", {}))
+
+        # Convert any timestamps to datetime objects
+        properties = data.get("properties", {})
+        for prop_name, prop_details in properties.items():
+            if prop_details["type"] == "datetime" and prop_details["value"] is not None:
+                prop_details["value"] = datetime.datetime.utcfromtimestamp(
+                    int(prop_details["value"]) / 1000
+                )
+
+        self.properties = properties
 
     def __getattr__(self, name: str):
         try:
