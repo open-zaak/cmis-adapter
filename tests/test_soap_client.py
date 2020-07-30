@@ -173,8 +173,8 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
         # Only a new Oio folder is created in the day_folder
         children = day_folder.get_children_folders()
         self.assertEqual(len(children), 2)
-        oio_folder = children[1]
-        self.assertEqual(oio_folder.name, "Oio")
+        for folder in children:
+            self.assertIn(folder.name, ["Oio", "Gebruiksrechten"])
 
     def test_create_gebruiksrechten(self):
         properties = {
