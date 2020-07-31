@@ -5,16 +5,15 @@ from datetime import date
 from io import BytesIO
 from typing import List, Optional, Union
 
-from drc_cmis.client.mapper import (
-    CONNECTION_MAP,
+from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,
     mapper,
 )
-from drc_cmis.client.utils import get_random_string
+from drc_cmis.utils.utils import get_random_string
 
-from .browser_request import CMISRequest
+from .request import CMISRequest
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +51,6 @@ class CMISBaseObject(CMISRequest):
         convert_name = f"drc:{name}"
         if self.name_map is not None and name in self.name_map:
             convert_name = self.name_map.get(name)
-        elif name in CONNECTION_MAP:
-            convert_name = CONNECTION_MAP.get(name)
 
         if convert_name not in self.properties:
             raise AttributeError(f"No property '{convert_name}'")

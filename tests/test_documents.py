@@ -1,19 +1,22 @@
 import datetime
 import io
+import os
 import uuid
+from unittest import skipIf
 
 from django.test import TestCase
 
-from drc_cmis.client.exceptions import (
-    DocumentDoesNotExistError,
-    FolderDoesNotExistError,
-)
+from drc_cmis.utils.exceptions import DocumentDoesNotExistError, FolderDoesNotExistError
 
-from .mixins import WebServiceTestCase
+from .mixins import DMSMixin
 
 
-class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
-    def test_build_properties(self):
+class CMISSOAPDocumentTests(DMSMixin, TestCase):
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "WEBSERVICE",
+        "The properties are builts differently with different bindings",
+    )
+    def test_build_properties_webservice(self):
         properties = {
             "integriteitwaarde": "Something",
             "verwijderd": "false",
@@ -48,6 +51,35 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
                 converted_prop_name = prop_name.split("__")[-1]
                 self.assertEqual(types[converted_prop_name], prop_dict["type"])
                 self.assertEqual(properties[converted_prop_name], prop_dict["value"])
+
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "BROWSER",
+        "The properties are builts differently with different bindings",
+    )
+    def test_build_properties_browser(self):
+        properties = {
+            "integriteitwaarde": "Something",
+            "verwijderd": "false",
+            "ontvangstdatum": datetime.date(2020, 7, 27),
+            "versie": 1,
+            "creatiedatum": datetime.date(2020, 7, 27),
+            "titel": "detailed summary",
+        }
+
+        identification = str(uuid.uuid4())
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties
+        )
+
+        built_properties = document.build_properties(data=properties)
+
+        self.assertIn("cmis:objectTypeId", built_properties)
+
+        for prop_name, prop_value in built_properties.items():
+
+            if prop_name.split("__")[-1] in properties:
+                converted_prop_name = prop_name.split("__")[-1]
+                self.assertEqual(properties[converted_prop_name], prop_value)
 
     def test_checkout_document(self):
         identification = str(uuid.uuid4())
@@ -125,7 +157,6 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
         )
         self.assertEqual(document.titel, "detailed summary")
         self.assertEqual(document.link, "http://a.link")
-        self.assertEqual(document.versionLabel, "1.0")
         posted_content = document.get_content_stream()
         content.seek(0)
         self.assertEqual(posted_content.read(), content.read())
@@ -140,7 +171,7 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
         updated_pwc = pwc.update_properties(properties=data, content=new_content)
         updated_document = updated_pwc.checkin("Testing properties update")
         self.assertEqual(updated_document.link, "http://an.updated.link")
-        self.assertEqual(updated_document.versionLabel, "2.0")
+        self.assertNotEqual(updated_document.versionLabel, document.versionLabel)
         updated_content = updated_document.get_content_stream()
         content.seek(0)
         self.assertEqual(updated_content.read(), b"Content after update")
@@ -159,7 +190,11 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
         content_stream = document.get_content_stream()
         self.assertEqual(content_stream.read(), b"Some very important content")
 
-    def test_set_content_stream(self):
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "WEBSERVICE",
+        "Version numbers differ between bindings",
+    )
+    def test_set_content_stream_webservice(self):
         identification = str(uuid.uuid4())
         data = {
             "creatiedatum": datetime.date(2020, 7, 27),
@@ -185,7 +220,42 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
         content_stream = latest_version.get_content_stream()
         self.assertEqual(content_stream.read(), b"Different content")
 
-    def test_get_all_versions(self):
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "BROWSER",
+        "Version numbers differ between bindings",
+    )
+    def test_set_content_stream_browser(self):
+        identification = str(uuid.uuid4())
+        data = {
+            "creatiedatum": datetime.date(2020, 7, 27),
+            "titel": "detailed summary",
+        }
+        content = io.BytesIO(b"Some very important content")
+        document = self.cmis_client.create_document(
+            identification=identification, data=data, content=content
+        )
+
+        # With browser binding creating a document with content creates 2 versions
+        all_versions = document.get_all_versions()
+        self.assertEqual(len(all_versions), 2)
+
+        content = io.BytesIO(b"Different content")
+        document.set_content_stream(content)
+
+        all_versions = document.get_all_versions()
+        self.assertEqual(len(all_versions), 3)
+
+        latest_version = all_versions[0]
+        self.assertEqual(latest_version.versionLabel, "1.2")
+
+        content_stream = latest_version.get_content_stream()
+        self.assertEqual(content_stream.read(), b"Different content")
+
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "WEBSERVICE",
+        "Version numbers differ between bindings",
+    )
+    def test_get_all_versions_webservice(self):
         identification = str(uuid.uuid4())
         data = {
             "creatiedatum": datetime.date(2020, 7, 27),
@@ -225,8 +295,55 @@ class CMISSOAPDocumentTests(WebServiceTestCase, TestCase):
         self.assertEqual(all_versions[1].versionLabel, "1.1")
         self.assertEqual(all_versions[2].versionLabel, "1.0")
 
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "BROWSER",
+        "Version numbers differ between bindings",
+    )
+    def test_get_all_versions_browser(self):
+        identification = str(uuid.uuid4())
+        data = {
+            "creatiedatum": datetime.date(2020, 7, 27),
+            "titel": "detailed summary",
+        }
+        content = io.BytesIO(b"Some very important content")
+        document = self.cmis_client.create_document(
+            identification=identification, data=data, content=content
+        )
 
-class CMISSOAPContentObjectsTests(WebServiceTestCase, TestCase):
+        # With browser binding, adding the content changes the document version
+        all_versions = document.get_all_versions()
+        self.assertEqual(len(all_versions), 2)
+
+        # Updating the content raises the version by 0.1
+        content = io.BytesIO(b"Different content")
+        document.set_content_stream(content)
+
+        all_versions = document.get_all_versions()
+        self.assertEqual(len(all_versions), 3)
+
+        self.assertEqual(all_versions[0].versionLabel, "1.2")
+        self.assertEqual(all_versions[1].versionLabel, "1.1")
+        self.assertEqual(all_versions[2].versionLabel, "1.0")
+
+        # Updating the properties raises the version by 1.0
+        new_properties = {
+            "link": "http://an.updated.link",
+        }
+        data = all_versions[0].build_properties(new_properties, new=False)
+        pwc = all_versions[0].checkout()
+        updated_pwc = pwc.update_properties(properties=data)
+        updated_pwc.checkin("Testing getting all versions update")
+
+        all_versions = document.get_all_versions()
+        self.assertEqual(len(all_versions), 4)
+
+        self.assertEqual(all_versions[0].versionLabel, "2.0")
+        self.assertEqual(all_versions[1].versionLabel, "1.2")
+        self.assertEqual(all_versions[2].versionLabel, "1.1")
+        self.assertEqual(all_versions[3].versionLabel, "1.0")
+
+
+class CMISSOAPContentObjectsTests(DMSMixin, TestCase):
     def test_delete_object(self):
         gebruiksrechten = self.cmis_client.create_content_object(
             data={}, object_type="gebruiksrechten"
@@ -248,7 +365,7 @@ class CMISSOAPContentObjectsTests(WebServiceTestCase, TestCase):
             self.cmis_client.get_content_object(oio.objectId, "oio")
 
 
-class CMISSOAPFolderTests(WebServiceTestCase, TestCase):
+class CMISSOAPFolderTests(DMSMixin, TestCase):
     def test_get_children_folders(self):
         base_folder = self.cmis_client.base_folder
         self.cmis_client.create_folder("TestFolder1", base_folder.objectId)

@@ -1,12 +1,14 @@
 import datetime
 import io
+import os
 import uuid
+from unittest import skipIf
 
 from django.test import TestCase
 
 from freezegun import freeze_time
 
-from drc_cmis.client.exceptions import (
+from drc_cmis.utils.exceptions import (
     DocumentDoesNotExistError,
     DocumentExistsError,
     DocumentLockedException,
@@ -14,13 +16,12 @@ from drc_cmis.client.exceptions import (
     FolderDoesNotExistError,
     LockDidNotMatchException,
 )
-from drc_cmis.cmis.soap_drc_document import Document, Folder
 
-from .mixins import WebServiceTestCase
+from .mixins import DMSMixin
 
 
 @freeze_time("2020-07-27")
-class CMISSOAPClientTests(WebServiceTestCase, TestCase):
+class CMISSOAPClientTests(DMSMixin, TestCase):
     def test_create_base_folder(self):
 
         self.assertIs(self.cmis_client._base_folder, None)
@@ -28,7 +29,7 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
         # Since the base folder hasn't been used yet, this will create it
         base_folder = self.cmis_client.base_folder
 
-        self.assertIsInstance(base_folder, Folder)
+        self.assertEqual(base_folder.baseTypeId, "cmis:folder")
         self.assertEqual(base_folder.name, self.cmis_client.base_folder_name)
 
     def test_get_base_folder(self):
@@ -39,9 +40,13 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
         # Since the base_folder has already been created, it will be retrieved
         base_folder = self.cmis_client.base_folder
 
-        self.assertIsInstance(base_folder, Folder)
+        self.assertEqual(base_folder.baseTypeId, "cmis:folder")
         self.assertEqual(base_folder.name, self.cmis_client.base_folder_name)
 
+    @skipIf(
+        os.getenv("CMIS_BINDING") == "BROWSER",
+        reason="Function not implemented for browser binding",
+    )
     def test_get_repository_info(self):
         properties = self.cmis_client.get_repository_info()
 
@@ -63,10 +68,6 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
         for expected_property in expected_properties:
             self.assertIn(expected_property, properties)
-
-    # TODO
-    def test_query(self):
-        pass
 
     def test_create_folder(self):
         base_folder = self.cmis_client.base_folder
@@ -395,7 +396,8 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
         self.cmis_client.lock_document(uuid=doc_uuid, lock=lock)
 
-        self.assertIsInstance(document.get_private_working_copy(), Document)
+        pwc = document.get_private_working_copy()
+        self.assertEqual(pwc.baseTypeId, "cmis:document")
 
     def test_already_locked_document(self):
         data = {
@@ -426,7 +428,8 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
         self.cmis_client.lock_document(uuid=doc_uuid, lock=lock)
 
-        self.assertIsInstance(document.get_private_working_copy(), Document)
+        pwc = document.get_private_working_copy()
+        self.assertEqual(pwc.baseTypeId, "cmis:document")
 
         unlocked_doc = self.cmis_client.unlock_document(uuid=doc_uuid, lock=lock)
 
@@ -461,7 +464,8 @@ class CMISSOAPClientTests(WebServiceTestCase, TestCase):
 
         self.cmis_client.lock_document(uuid=doc_uuid, lock=lock)
 
-        self.assertIsInstance(document.get_private_working_copy(), Document)
+        pwc = document.get_private_working_copy()
+        self.assertEqual(pwc.baseTypeId, "cmis:document")
 
         unlocked_doc = self.cmis_client.unlock_document(
             uuid=doc_uuid, lock=str(uuid.uuid4()), force=True

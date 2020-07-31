@@ -4,25 +4,24 @@ import uuid
 from io import BytesIO
 from typing import List, Optional, Union
 
-from drc_cmis.client.exceptions import CmisRuntimeException
-from drc_cmis.client.mapper import (
-    CONNECTION_MAP,
+from drc_cmis.utils.exceptions import CmisRuntimeException
+from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,
     mapper,
 )
-from drc_cmis.client.query import CMISQuery
-from drc_cmis.client.utils import get_random_string
-from drc_cmis.cmis.soap_request import SOAPCMISRequest
-from drc_cmis.cmis.utils import (
+from drc_cmis.utils.query import CMISQuery
+from drc_cmis.utils.utils import get_random_string
+from drc_cmis.webservice.data_models import EnkelvoudigInformatieObject, get_cmis_type
+from drc_cmis.webservice.request import SOAPCMISRequest
+from drc_cmis.webservice.utils import (
     extract_content,
     extract_num_items,
     extract_object_properties_from_xml,
     extract_xml_from_soap,
     make_soap_envelope,
 )
-from drc_cmis.data.data_models import EnkelvoudigInformatieObject, get_cmis_type
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +50,6 @@ class CMISBaseObject(SOAPCMISRequest):
         convert_name = f"drc:{name}"
         if self.name_map is not None and name in self.name_map:
             convert_name = self.name_map.get(name)
-        elif name in CONNECTION_MAP:
-            convert_name = CONNECTION_MAP.get(name)
 
         if convert_name not in self.properties:
             raise AttributeError(f"No property '{convert_name}'")
@@ -65,6 +62,7 @@ class CMISContentObject(CMISBaseObject):
         """Delete all versions of an object"""
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             object_id=self.objectId,
             cmis_action="deleteObject",
@@ -143,6 +141,7 @@ class Document(CMISContentObject):
         :return: Document
         """
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             object_id=object_id,
             cmis_action="getObject",
@@ -164,6 +163,7 @@ class Document(CMISContentObject):
         """Checkout a private working copy of the document"""
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             cmis_action="checkOut",
             object_id=str(self.objectId),
@@ -187,6 +187,7 @@ class Document(CMISContentObject):
 
     def checkin(self, checkin_comment: str, major: bool = True) -> "Document":
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             cmis_action="checkIn",
             object_id=str(self.objectId),
@@ -206,6 +207,7 @@ class Document(CMISContentObject):
     def get_all_versions(self) -> List["Document"]:
         object_id = self.objectId.split(";")[0]
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             cmis_action="getAllVersions",
             object_id=object_id,
@@ -235,6 +237,7 @@ class Document(CMISContentObject):
             self.set_content_stream(content)
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             properties=properties,
             cmis_action="updateProperties",
@@ -253,6 +256,7 @@ class Document(CMISContentObject):
 
     def get_content_stream(self) -> BytesIO:
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             object_id=self.objectId,
             cmis_action="getContentStream",
@@ -270,6 +274,7 @@ class Document(CMISContentObject):
         attachments = [(content_id, content)]
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             object_id=self.objectId,
             cmis_action="setContentStream",
@@ -302,6 +307,7 @@ class Folder(CMISBaseObject):
         query = CMISQuery("SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             statement=query(str(self.objectId)),
             cmis_action="query",
@@ -322,6 +328,7 @@ class Folder(CMISBaseObject):
         """Delete the folder and all its contents"""
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             folder_id=self.objectId,
             cmis_action="deleteTree",

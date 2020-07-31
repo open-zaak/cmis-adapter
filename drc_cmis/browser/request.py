@@ -3,7 +3,7 @@ from json.decoder import JSONDecodeError
 
 import requests
 
-from drc_cmis.client.exceptions import (
+from drc_cmis.utils.exceptions import (
     CmisBaseException,
     CmisInvalidArgumentException,
     CmisNotSupportedException,

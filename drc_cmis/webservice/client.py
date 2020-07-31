@@ -9,7 +9,7 @@ from django.utils.crypto import constant_time_compare
 from cmislib.domain import CmisId
 from cmislib.exceptions import UpdateConflictException
 
-from drc_cmis.client.exceptions import (
+from drc_cmis.utils.exceptions import (
     CmisUpdateConflictException,
     DocumentConflictException,
     DocumentDoesNotExistError,
@@ -20,29 +20,28 @@ from drc_cmis.client.exceptions import (
     FolderDoesNotExistError,
     LockDidNotMatchException,
 )
-from drc_cmis.client.mapper import mapper
-from drc_cmis.client.query import CMISQuery
-from drc_cmis.client.utils import get_random_string
-from drc_cmis.cmis.soap_drc_document import (
+from drc_cmis.utils.mapper import mapper
+from drc_cmis.utils.query import CMISQuery
+from drc_cmis.utils.utils import build_query_filters, get_random_string
+from drc_cmis.webservice.data_models import (
+    EnkelvoudigInformatieObject,
+    Gebruiksrechten as GebruiksRechtDoc,
+    Oio,
+    get_cmis_type,
+)
+from drc_cmis.webservice.drc_document import (
     Document,
     Folder,
     Gebruiksrechten,
     ObjectInformatieObject,
 )
-from drc_cmis.cmis.soap_request import SOAPCMISRequest
-from drc_cmis.cmis.utils import (
-    build_query_filters,
+from drc_cmis.webservice.request import SOAPCMISRequest
+from drc_cmis.webservice.utils import (
     extract_num_items,
     extract_object_properties_from_xml,
     extract_repo_info_from_xml,
     extract_xml_from_soap,
     make_soap_envelope,
-)
-from drc_cmis.data.data_models import (
-    EnkelvoudigInformatieObject,
-    Gebruiksrechten as GebruiksRechtDoc,
-    Oio,
-    get_cmis_type,
 )
 
 
@@ -61,6 +60,7 @@ class SOAPCMISClient(SOAPCMISRequest):
             query = CMISQuery("SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
 
             soap_envelope = make_soap_envelope(
+                auth=(self.user, self.password),
                 repository_id=self.main_repo_id,
                 statement=query(str(self.root_folder_id)),
                 cmis_action="query",
@@ -95,7 +95,9 @@ class SOAPCMISClient(SOAPCMISRequest):
 
     def get_repository_info(self) -> dict:
         soap_envelope = make_soap_envelope(
-            repository_id=self.main_repo_id, cmis_action="getRepositoryInfo",
+            auth=(self.user, self.password),
+            repository_id=self.main_repo_id,
+            cmis_action="getRepositoryInfo",
         )
 
         soap_response = self.request(
@@ -121,7 +123,10 @@ class SOAPCMISClient(SOAPCMISRequest):
         query = CMISQuery("SELECT * FROM %s%s" % (table, where))
 
         soap_envelope = make_soap_envelope(
-            repository_id=self.main_repo_id, statement=query(*rhs), cmis_action="query"
+            auth=(self.user, self.password),
+            repository_id=self.main_repo_id,
+            statement=query(*rhs),
+            cmis_action="query",
         )
 
         soap_response = self.request(
@@ -191,6 +196,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         }
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             folder_id=parent_id,
             properties=properties,
@@ -219,7 +225,10 @@ class SOAPCMISClient(SOAPCMISRequest):
         )
 
         soap_envelope = make_soap_envelope(
-            repository_id=self.main_repo_id, statement=query(uuid), cmis_action="query",
+            auth=(self.user, self.password),
+            repository_id=self.main_repo_id,
+            statement=query(uuid),
+            cmis_action="query",
         )
 
         soap_response = self.request(
@@ -287,6 +296,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         )
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             folder_id=object_folder.objectId,
             properties=properties,
@@ -305,6 +315,7 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         # Request all the properties of the newly created object
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             object_id=new_object_id,
             cmis_action="getObject",
@@ -342,6 +353,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         )
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             statement=query(object_type, str(uuid)),
             cmis_action="query",
@@ -409,6 +421,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         )
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             folder_id=document_folder.objectId,
             properties=properties,
@@ -431,6 +444,7 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         # Request all the properties of the newly created document
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             object_id=new_document_id,
             cmis_action="getObject",
@@ -574,6 +588,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         )
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             statement=query(uuid, filter_string),
             cmis_action="query",
@@ -608,6 +623,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         )
 
         soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
             repository_id=self.main_repo_id,
             statement=query(str(identification)),
             cmis_action="query",

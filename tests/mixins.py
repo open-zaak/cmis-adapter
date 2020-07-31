@@ -1,8 +1,29 @@
+import os
+
 from drc_cmis.client_builder import get_client_class
 from drc_cmis.models import CMISConfig
 
 
 class DMSMixin:
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+        if os.getenv("CMIS_BINDING") == "BROWSER":
+            CMISConfig.objects.create(
+                client_url="http://localhost:8082/alfresco/api/-default-/public/cmis/versions/1.1/browser",
+                binding="BROWSER",
+                client_user="admin",
+                client_password="admin",
+            )
+        elif os.getenv("CMIS_BINDING") == "WEBSERVICE":
+            CMISConfig.objects.create(
+                client_url="http://localhost:8082/alfresco/cmisws",
+                binding="WEBSERVICE",
+                client_user="admin",
+                client_password="admin",
+            )
+
     def setUp(self):
         super().setUp()
         client_class = get_client_class()
@@ -13,29 +34,3 @@ class DMSMixin:
     def _removeTree(self):
         base_folder = self.cmis_client.base_folder
         base_folder.delete_tree()
-
-
-class BrowserTestCase(DMSMixin):
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
-        CMISConfig.objects.create(
-            client_url="http://localhost:8082/alfresco/api/-default-/public/cmis/versions/1.1/browser",
-            binding="BROWSER",
-            client_user="admin",
-            client_password="admin",
-        )
-
-
-class WebServiceTestCase(DMSMixin):
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
-        CMISConfig.objects.create(
-            client_url="http://localhost:8082/alfresco/cmisws",
-            binding="WEBSERVICE",
-            client_user="admin",
-            client_password="admin",
-        )

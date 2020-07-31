@@ -8,16 +8,14 @@ from django.utils.crypto import constant_time_compare
 
 from cmislib.exceptions import UpdateConflictException
 
-from drc_cmis.cmis.browser_drc_document import (
+from drc_cmis.browser.drc_document import (
     Document,
     Folder,
     Gebruiksrechten,
     ObjectInformatieObject,
 )
-from drc_cmis.cmis.browser_request import CMISRequest
-from drc_cmis.cmis.utils import build_query_filters
-
-from .exceptions import (
+from drc_cmis.browser.request import CMISRequest
+from drc_cmis.utils.exceptions import (
     CmisUpdateConflictException,
     DocumentConflictException,
     DocumentDoesNotExistError,
@@ -29,9 +27,9 @@ from .exceptions import (
     GetFirstException,
     LockDidNotMatchException,
 )
-from .mapper import mapper
-from .query import CMISQuery
-from .utils import get_random_string
+from drc_cmis.utils.mapper import mapper
+from drc_cmis.utils.query import CMISQuery
+from drc_cmis.utils.utils import build_query_filters, get_random_string
 
 logger = logging.getLogger(__name__)
 

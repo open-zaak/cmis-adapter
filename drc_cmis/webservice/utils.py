@@ -1,9 +1,8 @@
 import logging
 import re
 from datetime import datetime, timedelta
-from decimal import Decimal
 from io import BytesIO
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from xml.dom import minidom
 
 from cmislib.util import parsePropValue
@@ -154,6 +153,7 @@ def extract_content(soap_response_body: str) -> BytesIO:
 
 def make_soap_envelope(
     cmis_action: str,
+    auth: Tuple[str, str],
     repository_id: Optional[str] = None,
     properties: Optional[dict] = None,
     statement: Optional[str] = None,
@@ -163,6 +163,21 @@ def make_soap_envelope(
     major: Optional[str] = None,
     checkin_comment: Optional[str] = None,
 ) -> minidom.Document:
+    """Create SOAP envelope from data provided
+
+    :param cmis_action: string, the cmis action to perform
+    :param auth: tuple, (username, password) for the DMS
+    :param repository_id: ID of the main repository (e.g. 8ca7d93b-2286-44b7-bfce-487211e6e9af)
+    :param properties: dictionary, properties of the object to create/update
+    :param statement: str, SQL statement used in query requests
+    :param object_id: str, ID of the node on which to act (e.g.
+        workspace://SpacesStore/2bdd4f3d-851f-499b-99ec-142b82ce3c0d)
+    :param folder_id: str, ID of a folder (e.g. needed when creating documents)
+    :param content_id: str, ID of the content of a document (as the content will be a MTOM attachment)
+    :param major: str, true or false whether the document being checked in is a major version
+    :param checkin_comment: str, comment when checking in a document
+    :return: minidom document
+    """
 
     xml_doc = minidom.Document()
 
@@ -208,12 +223,12 @@ def make_soap_envelope(
     username_token_tag = xml_doc.createElement("UsernameToken")
 
     username_tag = xml_doc.createElement("Username")
-    username_text = xml_doc.createTextNode("admin")
+    username_text = xml_doc.createTextNode(auth[0])
     username_tag.appendChild(username_text)
     username_token_tag.appendChild(username_tag)
 
     password_tag = xml_doc.createElement("Password")
-    password_text = xml_doc.createTextNode("admin")
+    password_text = xml_doc.createTextNode(auth[1])
     password_tag.appendChild(password_text)
     username_token_tag.appendChild(password_tag)
 
@@ -314,48 +329,3 @@ def extract_xml_from_soap(soap_response):
     end_xml = soap_response.find("</soap:Envelope>") + len("</soap:Envelope>")
 
     return soap_response[begin_xml:end_xml]
-
-
-def build_query_filters(
-    filters: dict,
-    object_type: str = None,
-    filter_string: str = "",
-    strip_end: bool = False,
-):
-    """Build filters for SQL query"""
-    from drc_cmis.client.mapper import mapper
-
-    if filters:
-        for key, value in filters.items():
-            if object_type is None:
-                if mapper(key):
-                    key = mapper(key)
-                elif mapper(key, type="connection"):
-                    key = mapper(key, type="connection")
-                elif mapper(key, type="gebruiksrechten"):
-                    key = mapper(key, type="gebruiksrechten")
-                elif mapper(key, type="oio"):
-                    key = mapper(key, type="oio")
-            else:
-                key = mapper(key, type=object_type)
-
-            if value and value in ["NULL", "NOT NULL"]:
-                filter_string += f"{key} IS {value} AND "
-            elif isinstance(value, Decimal):
-                filter_string += f"{key} = {value} AND "
-            elif isinstance(value, list):
-                if len(value) == 0:
-                    continue
-                filter_string += "( "
-                for item in value:
-                    sub_filter_string = build_query_filters({key: item}, strip_end=True)
-                    filter_string += f"{sub_filter_string} OR "
-                filter_string = filter_string[:-3]
-                filter_string += " ) AND "
-            elif value:
-                filter_string += f"{key} = '{value}' AND "
-
-    if strip_end and filter_string[-4:] == "AND ":
-        filter_string = filter_string[:-4]
-
-    return filter_string

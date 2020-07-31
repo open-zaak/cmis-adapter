@@ -2,7 +2,7 @@ from typing import BinaryIO, List, Optional, Tuple
 
 import requests
 
-from drc_cmis.client.exceptions import (
+from drc_cmis.utils.exceptions import (
     CmisBaseException,
     CmisInvalidArgumentException,
     CmisNotSupportedException,
@@ -11,7 +11,7 @@ from drc_cmis.client.exceptions import (
     CmisRuntimeException,
     CmisUpdateConflictException,
 )
-from drc_cmis.cmis.utils import (
+from drc_cmis.webservice.utils import (
     extract_repository_id_from_xml,
     extract_root_folder_id_from_xml,
     extract_xml_from_soap,
@@ -47,6 +47,14 @@ class SOAPCMISRequest:
         return CMISConfig.get_solo()
 
     @property
+    def user(self):
+        return self.config.client_user
+
+    @property
+    def password(self):
+        return self.config.client_password
+
+    @property
     def base_url(self):
         """Return the base URL
 
@@ -64,7 +72,9 @@ class SOAPCMISRequest:
         """Get ID of the CMS main repository"""
 
         if self._main_repo_id is None:
-            soap_envelope = make_soap_envelope(cmis_action="getRepositories")
+            soap_envelope = make_soap_envelope(
+                auth=(self.user, self.password), cmis_action="getRepositories"
+            )
             soap_response = self.request(
                 "RepositoryService", soap_envelope=soap_envelope.toxml()
             )
@@ -80,7 +90,9 @@ class SOAPCMISRequest:
 
         if self._root_folder_id is None:
             soap_envelope = make_soap_envelope(
-                cmis_action="getRepositoryInfo", repository_id=self.main_repo_id
+                auth=(self.user, self.password),
+                cmis_action="getRepositoryInfo",
+                repository_id=self.main_repo_id,
             )
             soap_response = self.request(
                 "RepositoryService", soap_envelope=soap_envelope.toxml()

@@ -4,8 +4,8 @@ import os
 from django.apps import AppConfig
 from django.conf import settings
 
-import drc_cmis.client.mapper as mapper
-from drc_cmis.client.mapper import (
+import drc_cmis.utils.mapper as mapper
+from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,

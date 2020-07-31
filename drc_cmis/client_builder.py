@@ -1,5 +1,5 @@
-from drc_cmis.client.browser_client import CMISDRCClient
-from drc_cmis.client.soap_client import SOAPCMISClient
+from drc_cmis.browser.client import CMISDRCClient
+from drc_cmis.webservice.client import SOAPCMISClient
 
 from .models import CMISConfig
 
