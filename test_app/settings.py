@@ -9,6 +9,9 @@ SITE_ID = 1
 
 IS_HTTPS = False
 
+USE_TZ = True
+TIME_ZONE = "UTC"
+
 INSTALLED_APPS = [
     "vng_api_common",
     "django.contrib.admin",

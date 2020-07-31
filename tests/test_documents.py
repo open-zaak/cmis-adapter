@@ -342,6 +342,22 @@ class CMISSOAPDocumentTests(DMSMixin, TestCase):
         self.assertEqual(all_versions[2].versionLabel, "1.1")
         self.assertEqual(all_versions[3].versionLabel, "1.0")
 
+    def test_delete_document_with_pwc(self):
+        identification = str(uuid.uuid4())
+        data = {
+            "creatiedatum": datetime.date(2020, 7, 27),
+            "titel": "detailed summary",
+        }
+        document = self.cmis_client.create_document(
+            identification=identification, data=data
+        )
+
+        pwc = document.checkout()
+
+        self.assertEqual(pwc.versionLabel, "pwc")
+
+        document.delete_object()
+
 
 class CMISSOAPContentObjectsTests(DMSMixin, TestCase):
     def test_delete_object(self):

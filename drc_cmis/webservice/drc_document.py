@@ -106,6 +106,10 @@ class Document(CMISContentObject):
                 if isinstance(value, datetime.date) or isinstance(value, datetime.date):
                     value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
                 props[prop_name] = {"value": str(value), "type": prop_type}
+            # When a Gebruiksrechten object is deleted, the field in the Document needs to be None.
+            elif key == "indicatie_gebruiksrecht":
+                prop_type = get_cmis_type(EnkelvoudigInformatieObject, key)
+                props[prop_name] = {"value": "", "type": prop_type}
 
         if new:
             object_type_id = {
@@ -286,6 +290,29 @@ class Document(CMISContentObject):
             soap_envelope=soap_envelope.toxml(),
             attachments=attachments,
         )
+
+    def delete_object(self):
+        """
+        Permanently delete the object from the CMIS store, with all its versions.
+
+        By default, all versions should be deleted according to the CMIS standard. If
+        the document is currently locked (i.e. there is a private working copy), we need
+        to cancel that checkout first.
+        """
+        pwc = self.get_private_working_copy()
+        if pwc is not None:
+            soap_envelope = make_soap_envelope(
+                auth=(self.user, self.password),
+                repository_id=self.main_repo_id,
+                object_id=pwc.objectId,
+                cmis_action="cancelCheckOut",
+            )
+
+            self.request(
+                "VersioningService", soap_envelope=soap_envelope.toxml(),
+            )
+
+        return super().delete_object()
 
 
 class Gebruiksrechten(CMISContentObject):

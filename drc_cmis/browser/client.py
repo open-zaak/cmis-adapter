@@ -4,6 +4,7 @@ from io import BytesIO
 from typing import List, Optional, Union
 from uuid import UUID
 
+from django.utils import timezone
 from django.utils.crypto import constant_time_compare
 
 from cmislib.exceptions import UpdateConflictException
@@ -163,7 +164,7 @@ class CMISDRCClient(CMISRequest):
             "oio",
         ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
 
-        now = datetime.datetime.now()
+        now = timezone.now()
         year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
         month_folder = self.get_or_create_folder(str(now.month), year_folder)
         day_folder = self.get_or_create_folder(str(now.day), month_folder)
@@ -264,7 +265,7 @@ class CMISDRCClient(CMISRequest):
         logger.debug("CMIS_CLIENT: create_document")
         self.check_document_exists(identification)
 
-        now = datetime.datetime.now()
+        now = timezone.now()
         data.setdefault("versie", 1)
 
         if content is None:
@@ -294,8 +295,10 @@ class CMISDRCClient(CMISRequest):
 
         prop_count = 2
         for prop_key, prop_value in properties.items():
-            if isinstance(prop_value, datetime.date):
-                prop_value = prop_value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            if isinstance(prop_value, datetime.date) or isinstance(
+                prop_value, datetime.datetime
+            ):
+                prop_value = prop_value.strftime("%Y-%m-%dT%H:%M:%S")
 
             data[f"propertyId[{prop_count}]"] = prop_key
             data[f"propertyValue[{prop_count}]"] = prop_value

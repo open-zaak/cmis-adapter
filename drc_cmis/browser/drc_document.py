@@ -5,6 +5,10 @@ from datetime import date
 from io import BytesIO
 from typing import List, Optional, Union
 
+from django.utils import timezone
+
+import pytz
+
 from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
@@ -29,8 +33,9 @@ class CMISBaseObject(CMISRequest):
         properties = data.get("properties", {})
         for prop_name, prop_details in properties.items():
             if prop_details["type"] == "datetime" and prop_details["value"] is not None:
-                prop_details["value"] = datetime.datetime.utcfromtimestamp(
-                    int(prop_details["value"]) / 1000
+                prop_details["value"] = timezone.make_aware(
+                    datetime.datetime.fromtimestamp(int(prop_details["value"]) / 1000),
+                    pytz.timezone("UTC"),
                 )
 
         self.properties = properties
@@ -218,16 +223,15 @@ class Document(CMISContentObject):
         the document is currently locked (i.e. there is a private working copy), we need
         to cancel that checkout first.
         """
-        if self.isVersionSeriesCheckedOut:
-            pwc = self.get_private_working_copy()
+        pwc = self.get_private_working_copy()
+        if pwc is not None:
             cancel_checkout_data = {
                 "cmisaction": "cancelCheckout",
                 "objectId": pwc.objectId,
             }
             self.post_request(self.root_folder_url, data=cancel_checkout_data)
 
-        data = {"objectId": self.objectId, "cmisaction": "delete"}
-        self.post_request(self.root_folder_url, data=data)
+        return super().delete_object()
 
 
 class Gebruiksrechten(CMISContentObject):

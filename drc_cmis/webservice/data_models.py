@@ -12,31 +12,32 @@ class EnkelvoudigInformatieObject:
     version_label: Decimal
     object_type_id: Id
     name: str
-    integriteitwaarde: str
+    integriteit_waarde: str
     titel: str
     bestandsnaam: str
     formaat: str
-    ondertekeningsoort: str
+    ondertekening_soort: str
     beschrijving: str
     identificatie: str
     verzenddatum: date
     taal: str
-    indicatiegebruiksrecht: str
+    indicatie_gebruiksrecht: str
     verwijderd: bool
     status: str
     ontvangstdatum: date
     informatieobjecttype: str
     auteur: str
     vertrouwelijkheidaanduiding: str
-    integriteitalgoritme: str
     begin_registratie: datetime
-    ondertekeningdatum: date
+    ondertekening_datum: date
     bronorganisatie: str
-    integriteitdatum: date
+    integriteit_datum: date
     link: str
     creatiedatum: date
     versie: Decimal
     lock: str
+    uuid: str
+    integriteit_algoritme: str
 
 
 @dataclass

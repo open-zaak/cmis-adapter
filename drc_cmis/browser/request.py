@@ -37,6 +37,10 @@ class CMISRequest:
         return f"{self.config.base_folder_name}"
 
     @property
+    def time_zone(self):
+        return self.config.time_zone
+
+    @property
     def root_folder_url(self):
         return f"{self.base_url}/root"
 
