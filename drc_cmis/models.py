@@ -17,6 +17,11 @@ class CMISConfig(SingletonModel):
     binding = models.CharField(
         choices=BINDING_CHOICES, default="BROWSER", max_length=200,
     )
+    time_zone = models.CharField(
+        default="UTC",
+        max_length=200,
+        help_text="The time zone of the DMS. Only needed when using Browser binding.",
+    )
     client_user = models.CharField(
         max_length=200, default="admin", help_text="Username for logging into DMS"
     )

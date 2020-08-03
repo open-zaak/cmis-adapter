@@ -35,7 +35,7 @@ class CMISBaseObject(CMISRequest):
             if prop_details["type"] == "datetime" and prop_details["value"] is not None:
                 prop_details["value"] = timezone.make_aware(
                     datetime.datetime.fromtimestamp(int(prop_details["value"]) / 1000),
-                    pytz.timezone("UTC"),
+                    pytz.timezone(self.time_zone),
                 )
 
         self.properties = properties

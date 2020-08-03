@@ -156,7 +156,6 @@ class Document(CMISContentObject):
         )
 
         xml_response = extract_xml_from_soap(soap_response)
-        # Maybe catch the exception for now and retrieve all the versions, then get the last one?
         extracted_data = extract_object_properties_from_xml(xml_response, "getObject")[
             0
         ]
