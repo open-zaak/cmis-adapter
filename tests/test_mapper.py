@@ -24,6 +24,14 @@ class MapperTests(TestCase):
     def test_mapper_get_unknown(self):
         self.assertIsNone(mapper("identificatie", "unknown"))
 
+    def test_mapper_get_zaaktype(self):
+        self.assertEqual(
+            mapper("identificatie", "zaaktype"), "drc:zaaktype__identificatie"
+        )
+
+    def test_mapper_get_zaak(self):
+        self.assertEqual(mapper("identificatie", "zaak"), "drc:zaak__identificatie")
+
 
 class ReverseMapperTests(TestCase):
     def test_mapper_get_document(self):

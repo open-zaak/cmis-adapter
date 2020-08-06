@@ -5,13 +5,17 @@ import uuid
 from unittest import skipIf
 
 from django.test import TestCase
+from django.utils import timezone
+
+from freezegun import freeze_time
 
 from drc_cmis.utils.exceptions import DocumentDoesNotExistError, FolderDoesNotExistError
 
 from .mixins import DMSMixin
 
 
-class CMISSOAPDocumentTests(DMSMixin, TestCase):
+@freeze_time("2020-07-27 12:00:00")
+class CMISDocumentTests(DMSMixin, TestCase):
     @skipIf(
         os.getenv("CMIS_BINDING") != "WEBSERVICE",
         "The properties are builts differently with different bindings",
@@ -358,8 +362,70 @@ class CMISSOAPDocumentTests(DMSMixin, TestCase):
 
         document.delete_object()
 
+    def test_move_document_to_folder(self):
+        base_folder = self.cmis_client.base_folder
+        new_folder = self.cmis_client.create_folder("Folder", base_folder.objectId)
 
-class CMISSOAPContentObjectsTests(DMSMixin, TestCase):
+        identification = str(uuid.uuid4())
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        # Document created in temporary folder
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties, content=content,
+        )
+
+        parent_folder = document.get_parent_folders()[0]
+
+        self.assertEqual(parent_folder.name, "27")
+
+        moved_document = document.move_object(new_folder)
+
+        parent_folder = moved_document.get_parent_folders()[0]
+
+        self.assertEqual(parent_folder.name, "Folder")
+
+    def test_get_parent_folders_of_document(self):
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification="d1bf9324-46c8-43ae-8bdb-d1a70d682f68",
+            data=properties,
+            content=content,
+        )
+
+        parent_folders = document.get_parent_folders()
+
+        self.assertEqual(len(parent_folders), 1)
+        # The object is created automatically in a temporary folder name after the current date
+        self.assertEqual(parent_folders[0].name, "27")
+
+
+@freeze_time("2020-07-27 12:00:00")
+class CMISContentObjectsTests(DMSMixin, TestCase):
     def test_delete_object(self):
         gebruiksrechten = self.cmis_client.create_content_object(
             data={}, object_type="gebruiksrechten"
@@ -380,8 +446,34 @@ class CMISSOAPContentObjectsTests(DMSMixin, TestCase):
             )
             self.cmis_client.get_content_object(oio.objectId, "oio")
 
+    def test_get_parent_folders_of_gebruiksrechten(self):
+        gebruiksrechten = self.cmis_client.create_content_object(
+            data={}, object_type="gebruiksrechten"
+        )
+        parent_folders = gebruiksrechten.get_parent_folders()
 
-class CMISSOAPFolderTests(DMSMixin, TestCase):
+        self.assertEqual(len(parent_folders), 1)
+        # The object is created automatically in a temporary folder name after the current date
+        self.assertEqual(parent_folders[0].name, "27")
+
+    def test_move_oio_to_folder(self):
+        base_folder = self.cmis_client.base_folder
+        new_folder = self.cmis_client.create_folder("Folder", base_folder.objectId)
+
+        oio = self.cmis_client.create_content_object(data={}, object_type="oio")
+
+        parent_folder = oio.get_parent_folders()[0]
+
+        self.assertEqual(parent_folder.name, "27")
+
+        moved_oio = oio.move_object(new_folder)
+
+        parent_folder = moved_oio.get_parent_folders()[0]
+
+        self.assertEqual(parent_folder.name, "Folder")
+
+
+class CMISFolderTests(DMSMixin, TestCase):
     def test_get_children_folders(self):
         base_folder = self.cmis_client.base_folder
         self.cmis_client.create_folder("TestFolder1", base_folder.objectId)

@@ -1,4 +1,3 @@
-import datetime
 import io
 import os
 import uuid
@@ -7,6 +6,7 @@ from unittest import skipIf
 from django.test import TestCase
 from django.utils import timezone
 
+import requests_mock
 from freezegun import freeze_time
 
 from drc_cmis.utils.exceptions import (
@@ -19,10 +19,11 @@ from drc_cmis.utils.exceptions import (
 )
 
 from .mixins import DMSMixin
+from .utils import mock_service_oas_get
 
 
 @freeze_time("2020-07-27 12:00:00")
-class CMISSOAPClientTests(DMSMixin, TestCase):
+class CMISClientFolderTests(DMSMixin, TestCase):
     def test_create_base_folder(self):
 
         self.assertIs(self.cmis_client._base_folder, None)
@@ -32,6 +33,47 @@ class CMISSOAPClientTests(DMSMixin, TestCase):
 
         self.assertEqual(base_folder.baseTypeId, "cmis:folder")
         self.assertEqual(base_folder.name, self.cmis_client.base_folder_name)
+
+    def test_create_zaaktype_folder(self):
+
+        # Create the zaaktype folder in the base folder
+        zaak_type = {
+            "url": "https://ref.tst.vng.cloud/ztc/api/v1/catalogussen/f7afd156-c8f5-4666-b8b5-28a4a9b5dfc7/zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1",
+            "identificatie": 1,
+            "omschrijving": "Melding Openbare Ruimte",
+        }
+
+        zaaktype_folder = self.cmis_client.get_or_create_zaaktype_folder(zaak_type)
+        self.assertEqual("zaaktype-", zaaktype_folder.name[:9])
+        self.assertEqual(zaaktype_folder.objectTypeId, "F:drc:zaaktypefolder")
+
+    def test_create_zaak_folder(self):
+
+        # Create the zaaktype folder in the base folder
+        zaak_type = {
+            "url": "https://ref.tst.vng.cloud/ztc/api/v1/catalogussen/f7afd156-c8f5-4666-b8b5-28a4a9b5dfc7/zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1",
+            "identificatie": 1,
+            "omschrijving": "Melding Openbare Ruimte",
+        }
+
+        zaaktype_folder = self.cmis_client.get_or_create_zaaktype_folder(zaak_type)
+
+        # Create the zaak folder in the zaaktype folder
+        zaak = {
+            "url": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            "identificatie": "1bcfd0d6-c817-428c-a3f4-4047038c184d",
+            "zaaktype": "https://ref.tst.vng.cloud/ztc/api/v1/catalogussen/f7afd156-c8f5-4666-b8b5-28a4a9b5dfc7/zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1",
+            "startdatum": "2023-12-06",
+            "einddatum": None,
+            "registratiedatum": "2019-04-17",
+            "bronorganisatie": "509381406",
+        }
+
+        zaak_folder = self.cmis_client.get_or_create_zaak_folder(
+            zaak=zaak, zaaktype_folder=zaaktype_folder,
+        )
+        self.assertEqual("zaak-", zaak_folder.name[:5])
+        self.assertEqual(zaak_folder.objectTypeId, "F:drc:zaakfolder")
 
     def test_get_base_folder(self):
         self.assertIs(self.cmis_client._base_folder, None)
@@ -140,6 +182,9 @@ class CMISSOAPClientTests(DMSMixin, TestCase):
             FolderDoesNotExistError, self.cmis_client.get_folder, folder3.objectId,
         )
 
+
+@freeze_time("2020-07-27 12:00:00")
+class CMISClientContentObjectsTests(DMSMixin, TestCase):
     def test_create_wrong_content_object(self):
         with self.assertRaises(AssertionError):
             self.cmis_client.create_content_object(data={}, object_type="wrongtype")
@@ -165,18 +210,11 @@ class CMISSOAPClientTests(DMSMixin, TestCase):
         self.assertEqual(len(children), 1)
         day_folder = children[0]
         self.assertEqual(day_folder.name, "27")
-        children = day_folder.get_children_folders()
-        self.assertEqual(len(children), 1)
-        gebruiksrechten_folder = children[0]
-        self.assertEqual(gebruiksrechten_folder.name, "Gebruiksrechten")
 
-        self.cmis_client.create_content_object(data={}, object_type="oio")
+        oio = self.cmis_client.create_content_object(data={}, object_type="oio")
 
-        # Only a new Oio folder is created in the day_folder
-        children = day_folder.get_children_folders()
-        self.assertEqual(len(children), 2)
-        for folder in children:
-            self.assertIn(folder.name, ["Oio", "Gebruiksrechten"])
+        # Check that the new oio is in the same folder
+        self.assertEqual(oio.get_parent_folders()[0].objectId, day_folder.objectId)
 
     def test_create_gebruiksrechten(self):
         properties = {
@@ -200,7 +238,7 @@ class CMISSOAPClientTests(DMSMixin, TestCase):
             properties["omschrijving_voorwaarden"],
         )
 
-    def test_create_oio(self):
+    def test_create_content_object_oio(self):
         properties = {
             "informatieobject": "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
             "object_type": "besluit",
@@ -295,6 +333,225 @@ class CMISSOAPClientTests(DMSMixin, TestCase):
                 uuid=gebruiksrechten.objectId, object_type="gebruiksrechten"
             )
 
+
+@freeze_time("2020-07-27 12:00:00")
+@requests_mock.Mocker(real_http=True)  # real HTTP for the Alfresco requests
+class CMISClientOIOTests(DMSMixin, TestCase):
+    base_zaak_url = "https://testserver/api/v1/"
+    base_zaaktype_url = "https://anotherserver/ztc/api/v1/"
+
+    zaak_url = f"{base_zaak_url}zaken/1c8e36be-338c-4c07-ac5e-1adf55bec04a"
+    zaak = {
+        "url": zaak_url,
+        "identificatie": "1bcfd0d6-c817-428c-a3f4-4047038c184d",
+        "zaaktype": f"{base_zaaktype_url}zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1",
+        "startdatum": "2023-12-06",
+        "einddatum": None,
+        "registratiedatum": "2019-04-17",
+        "bronorganisatie": "509381406",
+    }
+
+    zaaktype_url = f"{base_zaaktype_url}zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1"
+    zaaktype = {
+        "url": zaaktype_url,
+        "identificatie": 1,
+        "omschrijving": "Melding Openbare Ruimte",
+    }
+
+    another_zaak_url = f"{base_zaak_url}zaken/305e7c70-8a11-4321-80cc-e60498090fab"
+    another_zaak = {
+        "url": another_zaak_url,
+        "identificatie": "1717b1f0-16e5-42d4-ba28-cbce211bb94b",
+        "zaaktype": f"{base_zaaktype_url}zaaktypen/951172cc-9b59-4346-b4be-d3a4e1c3c0f1",
+        "startdatum": "2023-12-06",
+        "einddatum": None,
+        "registratiedatum": "2019-04-17",
+        "bronorganisatie": "509381406",
+    }
+
+    another_zaaktype_url = (
+        f"{base_zaaktype_url}zaaktypen/951172cc-9b59-4346-b4be-d3a4e1c3c0f1"
+    )
+    another_zaaktype = {
+        "url": another_zaaktype_url,
+        "identificatie": 2,
+        "omschrijving": "Melding Openbare Ruimte",
+    }
+
+    def test_create_oio_with_unlinked_document(self, m):
+        # Mocking the retrieval of the Zaak
+        m.get(self.zaak_url, json=self.zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktype
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        identification = str(uuid.uuid4())
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties, content=content,
+        )
+
+        # Test that the document is in the temporary folder
+        children = self.cmis_client.base_folder.get_children_folders()
+        year_folder = children[0]
+        children = year_folder.get_children_folders()
+        month_folder = children[0]
+        children = month_folder.get_children_folders()
+        day_folder = children[0]
+
+        self.assertEqual(day_folder.objectId, document.get_parent_folders()[0].objectId)
+
+        # Creating the oio must move the document to a new folder
+        oio = {
+            "object": self.zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        self.cmis_client.create_oio(oio)
+
+        # Test the new folder structure
+        children = self.cmis_client.base_folder.get_children_folders()
+        self.assertEqual(len(children), 2)
+        for child in children:
+            if child.name != "2020":
+                zaaktype_folder = child
+                break
+
+        self.assertEqual(zaaktype_folder.name, "zaaktype-Melding Openbare Ruimte-1")
+        zaak_folder = zaaktype_folder.get_children_folders()[0]
+        self.assertEqual(zaak_folder.name, "zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d")
+        children = zaak_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        year_folder = children[0]
+        self.assertEqual(year_folder.name, "2020")
+        children = year_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        month_folder = children[0]
+        self.assertEqual(month_folder.name, "7")
+        children = month_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        day_folder = children[0]
+        self.assertEqual(day_folder.name, "27")
+
+        self.assertEqual(day_folder.objectId, document.get_parent_folders()[0].objectId)
+
+    def test_create_oio_with_linked_document(self, m):
+        # Mocking the retrieval of the Zaaks
+        m.get(self.zaak_url, json=self.zaak)
+        m.get(self.another_zaak_url, json=self.another_zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktypes
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        m.get(self.another_zaaktype_url, json=self.another_zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Create document
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification="64d15843-1990-4af2-b6c8-d5a0be52402f",
+            data=properties,
+            content=content,
+        )
+
+        # Create an oio linked to this document
+        oio1 = {
+            "object": self.zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        self.cmis_client.create_oio(data=oio1)
+
+        # Create a second oio to link the same document to a different zaak
+        oio2 = {
+            "object": self.another_zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        self.cmis_client.create_oio(data=oio2)
+
+        # Test that the second folder structure
+        children = self.cmis_client.base_folder.get_children_folders()
+        self.assertEqual(len(children), 3)
+        children_folders_names = [folder.name for folder in children]
+        self.assertIn("zaaktype-Melding Openbare Ruimte-1", children_folders_names)
+        self.assertIn("zaaktype-Melding Openbare Ruimte-2", children_folders_names)
+        for folder in children:
+            if folder.name == "zaaktype-Melding Openbare Ruimte-2":
+                zaaktype_folder = folder
+                break
+
+        zaak_folder = zaaktype_folder.get_children_folders()[0]
+        self.assertEqual(zaak_folder.name, "zaak-1717b1f0-16e5-42d4-ba28-cbce211bb94b")
+        children = zaak_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        year_folder = children[0]
+        self.assertEqual(year_folder.name, "2020")
+        children = year_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        month_folder = children[0]
+        self.assertEqual(month_folder.name, "7")
+        children = month_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        day_folder = children[0]
+        self.assertEqual(day_folder.name, "27")
+
+        self.assertNotEqual(
+            day_folder.objectId, document.get_parent_folders()[0].objectId
+        )
+
+        # Check that there are 2 documents with the same identificatie
+        documents = self.cmis_client.query(
+            "Document",
+            lhs=["drc:document__identificatie = '%s'"],
+            rhs=[document.identificatie],
+        )
+
+        self.assertEqual(len(documents), 2)
+
+        # Check that one is a copy of the other
+        copied_document_was_retrieved = False
+        for retrieved_document in documents:
+            if retrieved_document.uuid != document.uuid:
+                copied_document = retrieved_document
+                copied_document_was_retrieved = True
+                break
+
+        self.assertTrue(copied_document_was_retrieved)
+        self.assertEqual(copied_document.kopie_van, document.uuid)
+
+
+@freeze_time("2020-07-27 12:00:00")
+class CMISClientDocumentTests(DMSMixin, TestCase):
     def test_create_document_with_content(self):
 
         identification = str(uuid.uuid4())
@@ -396,10 +653,6 @@ class CMISSOAPClientTests(DMSMixin, TestCase):
         self.assertEqual(len(children), 1)
         day_folder = children[0]
         self.assertEqual(day_folder.name, "27")
-        children = day_folder.get_children_folders()
-        self.assertEqual(len(children), 1)
-        document_folder = children[0]
-        self.assertEqual(document_folder.name, "Documents")
 
     def test_lock_document(self):
         data = {
@@ -568,3 +821,47 @@ class CMISSOAPClientTests(DMSMixin, TestCase):
             self.cmis_client.update_document(
                 uuid=doc_id, lock=str(uuid.uuid4()), data=new_properties
             )
+
+    def test_copy_document(self):
+        # Create first document
+        identification = str(uuid.uuid4())
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties, content=content,
+        )
+
+        # Make a different folder
+        destination_folder = self.cmis_client.create_folder(
+            "DestinationFolder", self.cmis_client.base_folder.objectId
+        )
+
+        # Copy the document
+        copied_document = self.cmis_client.copy_document(document, destination_folder)
+
+        for property_name, property_details in copied_document.properties.items():
+            # Properties such as the cmis:nodeRefId, the cmis:name, will be different
+            # The copied title contains the word 'copy'
+            if (
+                "cmis:" in property_name
+                or "titel" in property_name
+                or "kopie_van" in property_name
+            ):
+                continue
+            self.assertEqual(
+                property_details["value"], document.properties[property_name]["value"]
+            )
+
+        self.assertEqual(copied_document.kopie_van, document.uuid)

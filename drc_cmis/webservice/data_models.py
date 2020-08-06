@@ -38,6 +38,7 @@ class EnkelvoudigInformatieObject:
     lock: str
     uuid: str
     integriteit_algoritme: str
+    kopie_van: str
 
 
 @dataclass
@@ -60,6 +61,14 @@ class Oio:
     besluit: str
     zaak: str
     informatieobject: str
+
+
+@dataclass
+class ZaakFolderData:
+    url: str
+    identificatie: str
+    zaaktype: str
+    bronorganisatie: str
 
 
 CONVERTER = {

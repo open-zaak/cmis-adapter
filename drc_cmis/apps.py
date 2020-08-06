@@ -4,11 +4,13 @@ import os
 from django.apps import AppConfig
 from django.conf import settings
 
-import drc_cmis.utils.mapper as mapper
+from drc_cmis.utils import mapper as mapper
 from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,
+    ZAAK_MAP,
+    ZAAKTYPE_MAP,
 )
 
 
@@ -19,6 +21,8 @@ class CMISConfig(AppConfig):
 
     def ready(self):
         maps = {
+            "ZAAKTYPE_MAP": ZAAKTYPE_MAP,
+            "ZAAK_MAP": ZAAK_MAP,
             "DOCUMENT_MAP": DOCUMENT_MAP,
             "GEBRUIKSRECHTEN_MAP": GEBRUIKSRECHTEN_MAP,
             "OBJECTINFORMATIEOBJECT_MAP": OBJECTINFORMATIEOBJECT_MAP,
@@ -54,6 +58,10 @@ class CMISConfig(AppConfig):
         The maps are now configurable through a json file, so once the maps are initialised,
         the reverse maps need to be updated
         """
+        mapper.REVERSE_ZAAKTYPE_MAP = {
+            value: key for key, value in ZAAKTYPE_MAP.items()
+        }
+        mapper.REVERSE_ZAAK_MAP = {value: key for key, value in ZAAK_MAP.items()}
         mapper.REVERSE_DOCUMENT_MAP = {
             value: key for key, value in DOCUMENT_MAP.items()
         }

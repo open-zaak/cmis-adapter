@@ -14,8 +14,11 @@ from drc_cmis.browser.drc_document import (
     Folder,
     Gebruiksrechten,
     ObjectInformatieObject,
+    ZaakFolder,
+    ZaakTypeFolder,
 )
 from drc_cmis.browser.request import CMISRequest
+from drc_cmis.browser.utils import create_json_request_body
 from drc_cmis.utils.exceptions import (
     CmisUpdateConflictException,
     DocumentConflictException,
@@ -70,6 +73,8 @@ class CMISDRCClient(CMISRequest):
         error_message = f"No class {type_name} exists for this client."
         type_name = type_name.lower()
         assert type_name in [
+            "zaaktypefolder",
+            "zaakfolder",
             "folder",
             "document",
             "gebruiksrechten",
@@ -84,6 +89,10 @@ class CMISDRCClient(CMISRequest):
             return Gebruiksrechten
         elif type_name == "oio":
             return ObjectInformatieObject
+        elif type_name == "zaaktypefolder":
+            return ZaakTypeFolder
+        elif type_name == "zaakfolder":
+            return ZaakFolder
 
     # generic querying
     def query(self, return_type_name: str, lhs: List[str], rhs: List[str]):
@@ -100,12 +109,15 @@ class CMISDRCClient(CMISRequest):
     def get_all_versions(self, document: Document) -> List[Document]:
         return document.get_all_versions()
 
-    def get_or_create_folder(self, name: str, parent: Folder) -> Folder:
+    def get_or_create_folder(
+        self, name: str, parent: Folder, properties: dict = None
+    ) -> Folder:
         """
         Get or create the folder with :param:`name` in :param:`parent`.
 
         :param name: string, the name of the folder to create.
         :param parent: Folder, parent folder to create the folder in as subfolder.
+        :param properties: dict, contains the properties of the folder to create
         :return: Folder, the folder that was retrieved or created.
         """
         logger.debug("CMIS_CLIENT: _get_or_create_folder")
@@ -115,9 +127,47 @@ class CMISDRCClient(CMISRequest):
             if folder.name == name:
                 return folder
 
-        return self.create_folder(name, parent.objectId)
+        return self.create_folder(name, parent.objectId, properties)
 
-    def create_folder(self, name, parent_id):
+    def get_or_create_zaaktype_folder(self, zaaktype: dict) -> Folder:
+        """
+        Create a folder with the prefix 'zaaktype-' to make a zaaktype folder
+
+        Called by ZRC Notification client.
+        """
+        logger.debug("CMIS_CLIENT: get_or_create_zaaktype_folder")
+        properties = {
+            "cmis:objectTypeId": "F:drc:zaaktypefolder",
+            mapper("url", "zaaktype"): zaaktype.get("url"),
+            mapper("identificatie", "zaaktype"): zaaktype.get("identificatie"),
+        }
+
+        folder_name = (
+            f"zaaktype-{zaaktype.get('omschrijving')}-{zaaktype.get('identificatie')}"
+        )
+        cmis_folder = self.get_or_create_folder(
+            folder_name, self.base_folder, properties
+        )
+        return cmis_folder
+
+    def get_or_create_zaak_folder(self, zaak: dict, zaaktype_folder: Folder) -> Folder:
+        """
+        Create a folder with the prefix 'zaak-' to make a zaak folder
+        """
+        logger.debug("CMIS_CLIENT: get_or_create_zaak_folder")
+        properties = {
+            "cmis:objectTypeId": "F:drc:zaakfolder",
+            mapper("url", "zaak"): zaak.get("url"),
+            mapper("identificatie", "zaak"): zaak.get("identificatie"),
+            mapper("zaaktype", "zaak"): zaak.get("zaaktype"),
+            mapper("bronorganisatie", "zaak"): zaak.get("bronorganisatie"),
+        }
+        cmis_folder = self.get_or_create_folder(
+            f"zaak-{zaak.get('identificatie')}", zaaktype_folder, properties
+        )
+        return cmis_folder
+
+    def create_folder(self, name: str, parent_id: str, properties: dict = None):
         logger.debug("CMIS: DRC_DOCUMENT: create_folder")
         data = {
             "objectId": parent_id,
@@ -127,6 +177,13 @@ class CMISDRCClient(CMISRequest):
             "propertyId[1]": "cmis:objectTypeId",
             "propertyValue[1]": "cmis:folder",
         }
+
+        if properties is not None:
+            prop_count = 2
+            for prop, value in properties.items():
+                data[f"propertyId[{prop_count}]"] = prop
+                data[f"propertyValue[{prop_count}]"] = value
+                prop_count += 1
 
         json_response = self.post_request(self.root_folder_url, data=data)
         return Folder(json_response)
@@ -150,13 +207,104 @@ class CMISDRCClient(CMISRequest):
     def delete_cmis_folders_in_base(self):
         self.base_folder.delete_tree()
 
+    def create_oio(self, data: dict) -> ObjectInformatieObject:
+        """Create ObjectInformatieObject which relates a document with a zaak or besluit
+
+        There are 2 possible cases:
+        1. The document is already related to a zaak/besluit: a copy of the document is put in the
+            correct zaaktype/zaak folder.
+        2. The document is not related to anything: the document is moved from the temporary folder
+            to the correct zaaktype/zaak folder.
+
+        :param data: dict, the oio details.
+        :return: Oio created
+        """
+        from drc_cmis.client_builder import get_zds_client
+
+        # Get the document
+        document_uuid = data.get("informatieobject").split("/")[-1]
+        document = self.get_document(uuid=document_uuid)
+
+        # Retrieve the zaak and the zaaktype
+        client_zaak = get_zds_client(data["object"])
+        zaak_data = client_zaak.retrieve("zaak", url=data["object"])
+        client_zaaktype = get_zds_client(zaak_data["zaaktype"])
+        zaaktype_data = client_zaaktype.retrieve("zaaktype", url=zaak_data["zaaktype"])
+
+        # Get or create the destination folder
+        zaaktype_folder = self.get_or_create_zaaktype_folder(zaaktype_data)
+        zaak_folder = self.get_or_create_zaak_folder(zaak_data, zaaktype_folder)
+
+        now = timezone.now()
+        year_folder = self.get_or_create_folder(str(now.year), zaak_folder)
+        month_folder = self.get_or_create_folder(str(now.month), year_folder)
+        day_folder = self.get_or_create_folder(str(now.day), month_folder)
+
+        # Check if there are other Oios related to the document
+        retrieved_oios = self.query(
+            return_type_name="oio",
+            lhs=["drc:oio__informatieobject = '%s'"],
+            rhs=[data.get("informatieobject")],
+        )
+
+        # Case 1: Already related to a zaak. Copy the document to the destination folder.
+        if len(retrieved_oios) > 0:
+            self.copy_document(document, day_folder)
+        # Case 2: Not related to a zaak. Move the document to the destination folder
+        else:
+            document.move_object(day_folder)
+
+        # Create the Oio in the same folder
+        return self.create_content_object(
+            data=data, object_type="oio", destination_folder=day_folder
+        )
+
+    def copy_document(self, document: Document, destination_folder: Folder) -> Document:
+        """Copy document to a folder
+
+        :param document: Document, the document to copy
+        :param destination_folder: Folder, the folder in which to place the copied document
+        :return: the copied document
+        """
+        logger.debug("Document (Browser binding): make_copy")
+
+        # copy the properties from the source document
+        properties = {
+            property_name: property_details["value"]
+            for property_name, property_details in document.properties.items()
+            if "cmis:" not in property_name
+        }
+
+        properties.update(
+            **{
+                "cmis:objectTypeId": document.objectTypeId,
+                mapper("titel", type="document"): f"{document.titel} - copy",
+                "drc:kopie_van": document.uuid,  # Keep tack of where this is copied from.
+            }
+        )
+
+        # Update the cmis:name to make it more unique
+        file_name = f"{document.titel}-{get_random_string()}"
+        properties["cmis:name"] = file_name
+
+        data = create_json_request_body(destination_folder, properties)
+
+        content = document.get_content_stream()
+        json_response = self.post_request(self.root_folder_url, data=data)
+        cmis_doc = Document(json_response)
+        content.seek(0)
+
+        return cmis_doc.set_content_stream(content)
+
     def create_content_object(
-        self, data: dict, object_type: str
+        self, data: dict, object_type: str, destination_folder: Folder = None
     ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
         """Create a Gebruiksrechten or a ObjectInformatieObject
 
         :param data: dict, properties of the object to create
         :param object_type: string, either "gebruiksrechten" or "oio"
+        :param destination_folder: Folder, a folder where to create the object. If not provided,
+            the object will be placed in a temporary folder.
         :return: Either a Gebruiksrechten or ObjectInformatieObject
         """
         assert object_type in [
@@ -164,11 +312,11 @@ class CMISDRCClient(CMISRequest):
             "oio",
         ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
 
-        now = timezone.now()
-        year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
-        month_folder = self.get_or_create_folder(str(now.month), year_folder)
-        day_folder = self.get_or_create_folder(str(now.day), month_folder)
-        object_folder = self.get_or_create_folder(object_type.capitalize(), day_folder)
+        if destination_folder is None:
+            now = timezone.now()
+            year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
+            month_folder = self.get_or_create_folder(str(now.month), year_folder)
+            destination_folder = self.get_or_create_folder(str(now.day), month_folder)
 
         properties = {
             mapper(key, type=object_type): value
@@ -177,7 +325,7 @@ class CMISDRCClient(CMISRequest):
         }
 
         json_data = {
-            "objectId": object_folder.objectId,
+            "objectId": destination_folder.objectId,
             "cmisaction": "createDocument",
             "propertyId[0]": "cmis:name",
             "propertyValue[0]": get_random_string(),
@@ -253,7 +401,11 @@ class CMISDRCClient(CMISRequest):
         content_object.delete_object()
 
     def create_document(
-        self, identification: str, data: dict, content: BytesIO = None
+        self,
+        identification: str,
+        data: dict,
+        target_folder: Folder = None,
+        content: BytesIO = None,
     ) -> Document:
         """Create a cmis document.
 
@@ -271,38 +423,16 @@ class CMISDRCClient(CMISRequest):
         if content is None:
             content = BytesIO()
 
-        year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
-        month_folder = self.get_or_create_folder(str(now.month), year_folder)
-        day_folder = self.get_or_create_folder(str(now.day), month_folder)
-        document_folder = self.get_or_create_folder("Documents", day_folder)
+        if target_folder is None:
+            year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
+            month_folder = self.get_or_create_folder(str(now.month), year_folder)
+            target_folder = self.get_or_create_folder(str(now.day), month_folder)
 
         properties = Document.build_properties(
             data, new=True, identification=identification
         )
 
-        data = {
-            "objectId": document_folder.objectId,
-            "cmisaction": "createDocument",
-            "propertyId[0]": "cmis:name",
-            "propertyValue[0]": properties.pop("cmis:name"),
-        }
-
-        data["propertyId[1]"] = "cmis:objectTypeId"
-        if "cmis:objectTypeId" in properties.keys():
-            data["propertyValue[1]"] = properties.pop("cmis:objectTypeId")
-        else:
-            data["propertyValue[1]"] = "drc:document"
-
-        prop_count = 2
-        for prop_key, prop_value in properties.items():
-            if isinstance(prop_value, datetime.date) or isinstance(
-                prop_value, datetime.datetime
-            ):
-                prop_value = prop_value.strftime("%Y-%m-%dT%H:%M:%S")
-
-            data[f"propertyId[{prop_count}]"] = prop_key
-            data[f"propertyValue[{prop_count}]"] = prop_value
-            prop_count += 1
+        data = create_json_request_body(target_folder, properties)
 
         json_response = self.post_request(self.root_folder_url, data=data)
         cmis_doc = Document(json_response)

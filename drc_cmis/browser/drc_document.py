@@ -13,6 +13,8 @@ from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,
+    ZAAK_MAP,
+    ZAAKTYPE_MAP,
     mapper,
 )
 from drc_cmis.utils.utils import get_random_string
@@ -69,6 +71,40 @@ class CMISContentObject(CMISBaseObject):
         data = {"objectId": self.objectId, "cmisaction": "delete"}
         json_response = self.post_request(self.root_folder_url, data=data)
         return json_response
+
+    def get_parent_folders(self) -> List["Folder"]:
+        """Get the parent folders of an object.
+
+        An object has multiple parent folders if it has been multifiled.
+        """
+        logger.debug("CMIS: DRC_DOCUMENT: get_object_parents")
+        params = {
+            "objectId": self.objectId,
+            "cmisselector": "parents",
+        }
+
+        json_response = self.get_request(self.root_folder_url, params=params)
+        return self.get_all_objects(json_response, Folder)
+
+    def move_object(self, target_folder: "Folder"):
+        source_folder = self.get_parent_folders()[0]
+
+        data = {
+            "objectId": self.objectId,
+            "cmisaction": "move",
+            "sourceFolderId": source_folder.objectId,
+            "targetFolderId": target_folder.objectId,
+        }
+
+        logger.debug(f"From: {source_folder.name} To: {target_folder.name}")
+        logger.debug(
+            f"From: {source_folder.objectTypeId} To: {target_folder.objectTypeId}"
+        )
+        # invoke the URL
+        json_response = self.post_request(self.root_folder_url, data=data)
+        self.data = json_response
+        self.properties = json_response.get("properties")
+        return self
 
 
 class Document(CMISContentObject):
@@ -247,6 +283,8 @@ class ObjectInformatieObject(CMISContentObject):
 
 
 class Folder(CMISBaseObject):
+    table = "cmis:folder"
+
     def get_children_folders(self):
         logger.debug("CMIS: DRC_DOCUMENT: get_children")
         data = {
@@ -259,3 +297,13 @@ class Folder(CMISBaseObject):
     def delete_tree(self, **kwargs):
         data = {"objectId": self.objectId, "cmisaction": "deleteTree"}
         self.post_request(self.root_folder_url, data=data)
+
+
+class ZaakTypeFolder(CMISBaseObject):
+    table = "drc:zaaktypefolder"
+    name_map = ZAAKTYPE_MAP
+
+
+class ZaakFolder(CMISBaseObject):
+    table = "drc:zaakfolder"
+    name_map = ZAAK_MAP

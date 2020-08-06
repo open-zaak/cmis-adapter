@@ -4,6 +4,7 @@ from io import BytesIO
 from typing import List, Optional, Union
 from uuid import UUID
 
+from django.utils import timezone
 from django.utils.crypto import constant_time_compare
 
 from cmislib.domain import CmisId
@@ -20,7 +21,7 @@ from drc_cmis.utils.exceptions import (
     FolderDoesNotExistError,
     LockDidNotMatchException,
 )
-from drc_cmis.utils.mapper import mapper
+from drc_cmis.utils.mapper import mapper, reverse_mapper
 from drc_cmis.utils.query import CMISQuery
 from drc_cmis.utils.utils import build_query_filters, get_random_string
 from drc_cmis.webservice.data_models import (
@@ -34,6 +35,7 @@ from drc_cmis.webservice.drc_document import (
     Folder,
     Gebruiksrechten,
     ObjectInformatieObject,
+    ZaakFolder,
 )
 from drc_cmis.webservice.request import SOAPCMISRequest
 from drc_cmis.webservice.utils import (
@@ -164,11 +166,14 @@ class SOAPCMISClient(SOAPCMISRequest):
         """Get all versions of a document from the CMS"""
         return document.get_all_versions()
 
-    def get_or_create_folder(self, name: str, parent: Folder) -> Folder:
+    def get_or_create_folder(
+        self, name: str, parent: Folder, properties: dict = None
+    ) -> Folder:
         """Get or create a folder 'name/' in the parent folder
 
         :param name: string, the name of the folder to create
         :param parent: Folder, the parent folder
+        :param properties: dict, contains the properties of the folder to create
         :return: Folder, the folder that was created/retrieved
         """
 
@@ -178,13 +183,54 @@ class SOAPCMISClient(SOAPCMISRequest):
                 return folder
 
         # Create new folder, as it doesn't exist yet
-        return self.create_folder(name, parent.objectId)
+        return self.create_folder(name, parent.objectId, properties)
 
-    def create_folder(self, name: str, parent_id: str) -> Folder:
+    def get_or_create_zaaktype_folder(self, zaaktype: dict) -> Folder:
+        """Get or create the zaaktype folder in the base folder
+
+        :param zaaktype: dict, contains the properties of the zaaktype
+        :return: Folder
+        """
+        properties = {
+            "cmis:objectTypeId": {
+                "value": "F:drc:zaaktypefolder",
+                "type": "propertyId",
+            },
+            mapper("url", "zaaktype"): {
+                "value": zaaktype.get("url"),
+                "type": "propertyString",
+            },
+            mapper("identificatie", "zaaktype"): {
+                "value": str(zaaktype.get("identificatie")),
+                "type": "propertyString",
+            },
+        }
+
+        folder_name = (
+            f"zaaktype-{zaaktype.get('omschrijving')}-{zaaktype.get('identificatie')}"
+        )
+        cmis_folder = self.get_or_create_folder(
+            folder_name, self.base_folder, properties
+        )
+        return cmis_folder
+
+    def get_or_create_zaak_folder(self, zaak: dict, zaaktype_folder: Folder) -> Folder:
+        """
+        Create a folder with the prefix 'zaak-' to make a zaak folder
+        """
+        properties = ZaakFolder.build_properties(zaak)
+
+        return self.get_or_create_folder(
+            f"zaak-{zaak['identificatie']}", zaaktype_folder, properties
+        )
+
+    def create_folder(self, name: str, parent_id: str, data: dict = None) -> Folder:
         """Create a new folder inside a parent
 
         :param name: string, name of the new folder to create
         :param parent_id: string, cmis:objectId of the parent folder
+        :param data: dict, contains the properties of the folder to create.
+            The names of the properties are already converted to cmis names (e.g. drc:zaaktype__url)
         :return: Folder, the created folder
         """
 
@@ -194,6 +240,9 @@ class SOAPCMISClient(SOAPCMISRequest):
             "cmis:objectTypeId": {"value": object_type_id, "type": "propertyId"},
             "cmis:name": {"value": name, "type": "propertyString"},
         }
+
+        if data is not None:
+            properties.update(data)
 
         soap_envelope = make_soap_envelope(
             auth=(self.user, self.password),
@@ -248,14 +297,135 @@ class SOAPCMISClient(SOAPCMISRequest):
         """Deletest the base folder and all its contents"""
         self.base_folder.delete_tree()
 
-    # TODO Generalise so that it creates "Documents" too?
+    def create_oio(self, data: dict) -> ObjectInformatieObject:
+        """Create an object Informatieobject and move the related document to the correct folder.
+
+        There are 2 possible cases:
+        1. The document is already related to a zaak/besluit: a copy of the document is put in the
+            correct zaaktype/zaak folder.
+        2. The document is not related to anything: the document is moved from the temporary folder
+            to the correct zaaktype/zaak folder.
+
+        :param data: dict, details of the oio
+        :return: ObjectInformatieObject, the created oio
+        """
+        from drc_cmis.client_builder import get_zds_client
+
+        # Get the document
+        document_uuid = data.get("informatieobject").split("/")[-1]
+        document = self.get_document(uuid=document_uuid)
+
+        # Retrieve the zaak and the zaaktype
+        client_zaak = get_zds_client(data["object"])
+        zaak_data = client_zaak.retrieve("zaak", url=data["object"])
+        client_zaaktype = get_zds_client(zaak_data["zaaktype"])
+        zaaktype_data = client_zaaktype.retrieve("zaaktype", url=zaak_data["zaaktype"])
+
+        # Get or create the destination folder
+        zaaktype_folder = self.get_or_create_zaaktype_folder(zaaktype_data)
+        zaak_folder = self.get_or_create_zaak_folder(zaak_data, zaaktype_folder)
+
+        now = timezone.now()
+        year_folder = self.get_or_create_folder(str(now.year), zaak_folder)
+        month_folder = self.get_or_create_folder(str(now.month), year_folder)
+        day_folder = self.get_or_create_folder(str(now.day), month_folder)
+
+        # Check if there are other Oios related to the document
+        retrieved_oios = self.query(
+            return_type_name="Oio",
+            lhs=["drc:oio__informatieobject = '%s'"],
+            rhs=[data.get("informatieobject")],
+        )
+
+        # Case 1: Already related to a zaak. Copy the document to the destination folder.
+        if len(retrieved_oios) > 0:
+            self.copy_document(document, day_folder)
+        # Case 2: Not related to a zaak. Move the document to the destination folder
+        else:
+            document.move_object(day_folder)
+
+        # Create the Oio in the same folder
+        return self.create_content_object(
+            data=data, object_type="oio", destination_folder=day_folder
+        )
+
+    def copy_document(self, document: Document, destination_folder: Folder) -> Document:
+        """Copy document to a folder
+
+        :param document: Document, the document to copy
+        :param destination_folder: Folder, the folder in which to place the copied document
+        :return: the copied document
+        """
+
+        def get_property_type(cmis_name: str) -> str:
+            drc_name = reverse_mapper(cmis_name, type="document")
+            return get_cmis_type(EnkelvoudigInformatieObject, drc_name)
+
+        # copy the properties from the source document
+        drc_properties = {}
+        for property_name, property_details in document.properties.items():
+            if "cmis:" not in property_name and property_details["value"] is not None:
+                drc_properties[
+                    reverse_mapper(property_name, type="document")
+                ] = property_details["value"]
+
+        cmis_properties = Document.build_properties(drc_properties, new=False)
+
+        cmis_properties.update(
+            **{
+                "cmis:objectTypeId": {
+                    "value": document.objectTypeId,
+                    "type": "propertyId",
+                },
+                mapper("titel", type="document"): {
+                    "value": f"{document.titel} - copy",
+                    "type": "propertyString",
+                },
+                "drc:kopie_van": {
+                    "value": document.uuid,
+                    "type": "propertyString",
+                },  # Keep tack of where this is copied from.
+            }
+        )
+
+        # Update the cmis:name to make it more unique
+        file_name = f"{document.titel}-{get_random_string()}"
+        cmis_properties["cmis:name"] = {"value": file_name, "type": "propertyString"}
+
+        # Create copy document
+        content_id = str(uuid.uuid4())
+        soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
+            repository_id=self.main_repo_id,
+            folder_id=destination_folder.objectId,
+            properties=cmis_properties,
+            cmis_action="createDocument",
+            content_id=content_id,
+        )
+
+        soap_response = self.request(
+            "ObjectService",
+            soap_envelope=soap_envelope.toxml(),
+            attachments=[(content_id, document.get_content_stream())],
+        )
+
+        # Creating the document only returns its ID
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_object_properties_from_xml(
+            xml_response, "createDocument"
+        )[0]
+        copy_document_id = extracted_data["properties"]["objectId"]["value"]
+
+        return document.get_document(copy_document_id)
+
     def create_content_object(
-        self, data: dict, object_type: str
+        self, data: dict, object_type: str, destination_folder: Folder = None
     ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
         """Create a Gebruiksrechten or a ObjectInformatieObject
 
         :param data: dict, properties of the object to create
         :param object_type: string, either "gebruiksrechten" or "oio"
+        :param destination_folder: Folder, the folder in which to place the object
         :return: Either a Gebruiksrechten or ObjectInformatieObject
         """
         assert object_type in [
@@ -270,11 +440,11 @@ class SOAPCMISClient(SOAPCMISRequest):
             return_type = Gebruiksrechten
             data_class = GebruiksRechtDoc
 
-        now = datetime.datetime.now()
-        year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
-        month_folder = self.get_or_create_folder(str(now.month), year_folder)
-        day_folder = self.get_or_create_folder(str(now.day), month_folder)
-        object_folder = self.get_or_create_folder(object_type.capitalize(), day_folder)
+        if destination_folder is None:
+            now = datetime.datetime.now()
+            year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
+            month_folder = self.get_or_create_folder(str(now.month), year_folder)
+            destination_folder = self.get_or_create_folder(str(now.day), month_folder)
 
         properties = {}
         for key, value in data.items():
@@ -298,7 +468,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         soap_envelope = make_soap_envelope(
             auth=(self.user, self.password),
             repository_id=self.main_repo_id,
-            folder_id=object_folder.objectId,
+            folder_id=destination_folder.objectId,
             properties=properties,
             cmis_action="createDocument",
         )
@@ -414,7 +584,6 @@ class SOAPCMISClient(SOAPCMISRequest):
         year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
         month_folder = self.get_or_create_folder(str(now.month), year_folder)
         day_folder = self.get_or_create_folder(str(now.day), month_folder)
-        document_folder = self.get_or_create_folder("Documents", day_folder)
 
         properties = Document.build_properties(
             data, new=True, identification=identification
@@ -423,7 +592,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         soap_envelope = make_soap_envelope(
             auth=(self.user, self.password),
             repository_id=self.main_repo_id,
-            folder_id=document_folder.objectId,
+            folder_id=day_folder.objectId,
             properties=properties,
             cmis_action="createDocument",
             content_id=content_id,

@@ -9,11 +9,17 @@ from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,
+    ZAAK_MAP,
+    ZAAKTYPE_MAP,
     mapper,
 )
 from drc_cmis.utils.query import CMISQuery
 from drc_cmis.utils.utils import get_random_string
-from drc_cmis.webservice.data_models import EnkelvoudigInformatieObject, get_cmis_type
+from drc_cmis.webservice.data_models import (
+    EnkelvoudigInformatieObject,
+    ZaakFolderData,
+    get_cmis_type,
+)
 from drc_cmis.webservice.request import SOAPCMISRequest
 from drc_cmis.webservice.utils import (
     extract_content,
@@ -70,6 +76,50 @@ class CMISContentObject(CMISBaseObject):
 
         self.request("ObjectService", soap_envelope=soap_envelope.toxml())
 
+    def get_parent_folders(self) -> List["Folder"]:
+        """Get all the parent folders of an object"""
+
+        soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
+            repository_id=self.main_repo_id,
+            object_id=self.objectId,
+            cmis_action="getObjectParents",
+        )
+
+        soap_response = self.request(
+            "NavigationService", soap_envelope=soap_envelope.toxml()
+        )
+        xml_response = extract_xml_from_soap(soap_response)
+
+        extracted_data = extract_object_properties_from_xml(
+            xml_response, "getObjectParents"
+        )
+        return [Folder(data) for data in extracted_data]
+
+    def move_object(self, target_folder: "Folder") -> "CMISContentObject":
+        """Move a document to the specified folder"""
+
+        source_folder = self.get_parent_folders()[0]
+
+        soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
+            repository_id=self.main_repo_id,
+            object_id=self.objectId,
+            target_folder_id=target_folder.objectId,
+            source_folder_id=source_folder.objectId,
+            cmis_action="moveObject",
+        )
+
+        soap_response = self.request(
+            "ObjectService", soap_envelope=soap_envelope.toxml()
+        )
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_object_properties_from_xml(xml_response, "moveObject")[
+            0
+        ]
+
+        return type(self)(extracted_data)
+
 
 class Document(CMISContentObject):
     table = "drc:document"
@@ -105,6 +155,8 @@ class Document(CMISContentObject):
                 prop_type = get_cmis_type(EnkelvoudigInformatieObject, key)
                 if isinstance(value, datetime.date) or isinstance(value, datetime.date):
                     value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                elif isinstance(value, bool):
+                    value = str(value).lower()
                 props[prop_name] = {"value": str(value), "type": prop_type}
             # When a Gebruiksrechten object is deleted, the field in the Document needs to be None.
             elif key == "indicatie_gebruiksrecht":
@@ -327,6 +379,8 @@ class ObjectInformatieObject(CMISContentObject):
 
 
 class Folder(CMISBaseObject):
+    table = "cmis:folder"
+
     def get_children_folders(self) -> List:
         """Get all the folders in the current folder"""
 
@@ -361,3 +415,52 @@ class Folder(CMISBaseObject):
         )
 
         self.request("ObjectService", soap_envelope=soap_envelope.toxml())
+
+
+class ZaakTypeFolder(CMISBaseObject):
+    table = "drc:zaaktypefolder"
+    name_map = ZAAKTYPE_MAP
+
+
+class ZaakFolder(CMISBaseObject):
+    table = "drc:zaakfolder"
+    object_type_id = "F:drc:zaakfolder"
+    name_map = ZAAK_MAP
+
+    @classmethod
+    def build_properties(cls, data: dict) -> dict:
+        """Construct property dictionary.
+
+        The structure of the dictionary is (where ``property_name``, ``property_value``
+        and ``property_type`` are the name, value and type of the property):
+
+            .. code-block:: python
+
+                properties = {
+                    "property_name": {
+                        "value": property_value,
+                        "type": property_type,
+                    }
+                }
+        """
+
+        props = {}
+
+        object_type_id = {
+            "value": cls.object_type_id,
+            "type": "propertyId",
+        }
+        props.setdefault("cmis:objectTypeId", object_type_id)
+
+        for key, value in data.items():
+            prop_name = mapper(key, type="zaakfolder")
+            if not prop_name:
+                logger.debug("No property name found for key '%s'", key)
+                continue
+            if value is not None:
+                prop_type = get_cmis_type(ZaakFolderData, key)
+                if isinstance(value, datetime.date) or isinstance(value, datetime.date):
+                    value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                props[prop_name] = {"value": str(value), "type": prop_type}
+
+        return props

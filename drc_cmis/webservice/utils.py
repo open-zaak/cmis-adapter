@@ -71,7 +71,7 @@ def extract_object_properties_from_xml(xml_data: str, cmis_action: str) -> List[
             if node_name == "object":
                 extracted_properties = extract_properties(child_node)
                 all_objects.append({"properties": extracted_properties})
-            if node_name == "objects":
+            if node_name == "objects" or node_name == "parents":
                 if len(child_node.getElementsByTagName("objects")) > 0:
                     for object_nodes in child_node.childNodes:
                         if len(object_nodes.getElementsByTagName("ns2:properties")) > 0:
@@ -162,6 +162,8 @@ def make_soap_envelope(
     content_id: Optional[str] = None,
     major: Optional[str] = None,
     checkin_comment: Optional[str] = None,
+    source_folder_id: Optional[str] = None,
+    target_folder_id: Optional[str] = None,
 ) -> minidom.Document:
     """Create SOAP envelope from data provided
 
@@ -318,6 +320,18 @@ def make_soap_envelope(
         comment_text = xml_doc.createTextNode(checkin_comment)
         comment_element.appendChild(comment_text)
         action_element.appendChild(comment_element)
+
+    if source_folder_id is not None:
+        source_folder_element = xml_doc.createElement("ns:sourceFolderId")
+        source_folder_text = xml_doc.createTextNode(source_folder_id)
+        source_folder_element.appendChild(source_folder_text)
+        action_element.appendChild(source_folder_element)
+
+    if target_folder_id is not None:
+        target_folder_element = xml_doc.createElement("ns:targetFolderId")
+        target_folder_text = xml_doc.createTextNode(target_folder_id)
+        target_folder_element.appendChild(target_folder_text)
+        action_element.appendChild(target_folder_element)
 
     entry_element.appendChild(body_element)
 

@@ -1,6 +1,6 @@
 import os
 
-from drc_cmis.client_builder import get_client_class
+from drc_cmis.client_builder import get_cmis_client
 from drc_cmis.models import CMISConfig
 
 
@@ -26,8 +26,7 @@ class DMSMixin:
 
     def setUp(self):
         super().setUp()
-        client_class = get_client_class()
-        self.cmis_client = client_class()
+        self.cmis_client = get_cmis_client()
         self._removeTree()
         self.cmis_client._base_folder = None
 
