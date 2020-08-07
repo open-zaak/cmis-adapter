@@ -454,7 +454,7 @@ class CMISContentObjectsTests(DMSMixin, TestCase):
 
         self.assertEqual(len(parent_folders), 1)
         # The object is created automatically in a temporary folder name after the current date
-        self.assertEqual(parent_folders[0].name, "27")
+        self.assertEqual(parent_folders[0].name, "Related data")
 
     def test_move_oio_to_folder(self):
         base_folder = self.cmis_client.base_folder
@@ -464,7 +464,7 @@ class CMISContentObjectsTests(DMSMixin, TestCase):
 
         parent_folder = oio.get_parent_folders()[0]
 
-        self.assertEqual(parent_folder.name, "27")
+        self.assertEqual(parent_folder.name, "Related data")
 
         moved_oio = oio.move_object(new_folder)
 

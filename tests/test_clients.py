@@ -210,11 +210,17 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
         self.assertEqual(len(children), 1)
         day_folder = children[0]
         self.assertEqual(day_folder.name, "27")
+        children = day_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        related_data_folder = children[0]
+        self.assertEqual(related_data_folder.name, "Related data")
 
         oio = self.cmis_client.create_content_object(data={}, object_type="oio")
 
         # Check that the new oio is in the same folder
-        self.assertEqual(oio.get_parent_folders()[0].objectId, day_folder.objectId)
+        self.assertEqual(
+            oio.get_parent_folders()[0].objectId, related_data_folder.objectId
+        )
 
     def test_create_gebruiksrechten(self):
         properties = {

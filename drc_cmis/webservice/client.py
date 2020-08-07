@@ -337,6 +337,7 @@ class SOAPCMISClient(SOAPCMISRequest):
         year_folder = self.get_or_create_folder(str(now.year), zaak_folder)
         month_folder = self.get_or_create_folder(str(now.month), year_folder)
         day_folder = self.get_or_create_folder(str(now.day), month_folder)
+        related_data_folder = self.get_or_create_folder("Related data", day_folder)
 
         # Check if there are other Oios related to the document
         retrieved_oios = self.query(
@@ -352,9 +353,9 @@ class SOAPCMISClient(SOAPCMISRequest):
         else:
             document.move_object(day_folder)
 
-        # Create the Oio in the same folder
+        # Create the Oio in a separate folder
         return self.create_content_object(
-            data=data, object_type="oio", destination_folder=day_folder
+            data=data, object_type="oio", destination_folder=related_data_folder
         )
 
     def copy_document(self, document: Document, destination_folder: Folder) -> Document:
@@ -452,7 +453,8 @@ class SOAPCMISClient(SOAPCMISRequest):
             now = datetime.datetime.now()
             year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
             month_folder = self.get_or_create_folder(str(now.month), year_folder)
-            destination_folder = self.get_or_create_folder(str(now.day), month_folder)
+            day_folder = self.get_or_create_folder(str(now.day), month_folder)
+            destination_folder = self.get_or_create_folder("Related data", day_folder)
 
         properties = {}
         for key, value in data.items():
