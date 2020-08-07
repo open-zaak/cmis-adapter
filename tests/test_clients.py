@@ -337,6 +337,7 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
 @freeze_time("2020-07-27 12:00:00")
 @requests_mock.Mocker(real_http=True)  # real HTTP for the Alfresco requests
 class CMISClientOIOTests(DMSMixin, TestCase):
+    base_besluit_url = "https://yetanothertestserver/api/v1/"
     base_zaak_url = "https://testserver/api/v1/"
     base_zaaktype_url = "https://anotherserver/ztc/api/v1/"
 
@@ -349,6 +350,18 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         "einddatum": None,
         "registratiedatum": "2019-04-17",
         "bronorganisatie": "509381406",
+    }
+
+    besluit_url = f"{base_besluit_url}besluit/9d3dd93a-778d-4d26-8c48-db7b2a584307"
+    besluit = {
+        "verantwoordelijke_organisatie": "517439943",
+        "identificatie": "123123",
+        "besluittype": f"http://testserver/besluittype/some-random-id",
+        "zaak": zaak_url,
+        "datum": "2018-09-06",
+        "toelichting": "Vergunning verleend.",
+        "ingangsdatum": "2018-10-01",
+        "vervaldatum": "2018-11-01",
     }
 
     zaaktype_url = f"{base_zaaktype_url}zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1"
@@ -378,7 +391,7 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         "omschrijving": "Melding Openbare Ruimte",
     }
 
-    def test_create_oio_with_unlinked_document(self, m):
+    def test_create_zaak_oio_with_unlinked_document(self, m):
         # Mocking the retrieval of the Zaak
         m.get(self.zaak_url, json=self.zaak)
         mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
@@ -451,7 +464,7 @@ class CMISClientOIOTests(DMSMixin, TestCase):
 
         self.assertEqual(day_folder.objectId, document.get_parent_folders()[0].objectId)
 
-    def test_create_oio_with_linked_document(self, m):
+    def test_create_zaak_oio_with_linked_document(self, m):
         # Mocking the retrieval of the Zaaks
         m.get(self.zaak_url, json=self.zaak)
         m.get(self.another_zaak_url, json=self.another_zaak)
@@ -512,6 +525,185 @@ class CMISClientOIOTests(DMSMixin, TestCase):
 
         zaak_folder = zaaktype_folder.get_children_folders()[0]
         self.assertEqual(zaak_folder.name, "zaak-1717b1f0-16e5-42d4-ba28-cbce211bb94b")
+        children = zaak_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        year_folder = children[0]
+        self.assertEqual(year_folder.name, "2020")
+        children = year_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        month_folder = children[0]
+        self.assertEqual(month_folder.name, "7")
+        children = month_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        day_folder = children[0]
+        self.assertEqual(day_folder.name, "27")
+
+        self.assertNotEqual(
+            day_folder.objectId, document.get_parent_folders()[0].objectId
+        )
+
+        # Check that there are 2 documents with the same identificatie
+        documents = self.cmis_client.query(
+            "Document",
+            lhs=["drc:document__identificatie = '%s'"],
+            rhs=[document.identificatie],
+        )
+
+        self.assertEqual(len(documents), 2)
+
+        # Check that one is a copy of the other
+        copied_document_was_retrieved = False
+        for retrieved_document in documents:
+            if retrieved_document.uuid != document.uuid:
+                copied_document = retrieved_document
+                copied_document_was_retrieved = True
+                break
+
+        self.assertTrue(copied_document_was_retrieved)
+        self.assertEqual(copied_document.kopie_van, document.uuid)
+
+    def test_create_besluit_oio_with_unlinked_document(self, m):
+        # Mocking the retrieval of the Besluit
+        m.get(self.besluit_url, json=self.besluit)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_besluit_url)
+
+        # Mocking the retrieval of the Zaak
+        m.get(self.zaak_url, json=self.zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktype
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        identification = str(uuid.uuid4())
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties, content=content,
+        )
+
+        # Test that the document is in the temporary folder
+        children = self.cmis_client.base_folder.get_children_folders()
+        year_folder = children[0]
+        children = year_folder.get_children_folders()
+        month_folder = children[0]
+        children = month_folder.get_children_folders()
+        day_folder = children[0]
+
+        self.assertEqual(day_folder.objectId, document.get_parent_folders()[0].objectId)
+
+        # Creating the oio must move the document to a new folder
+        oio = {
+            "object": self.besluit_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "besluit",
+        }
+        self.cmis_client.create_oio(oio)
+
+        # Test the new folder structure
+        children = self.cmis_client.base_folder.get_children_folders()
+        self.assertEqual(len(children), 2)
+        for child in children:
+            if child.name != "2020":
+                zaaktype_folder = child
+                break
+
+        self.assertEqual(zaaktype_folder.name, "zaaktype-Melding Openbare Ruimte-1")
+        zaak_folder = zaaktype_folder.get_children_folders()[0]
+        self.assertEqual(zaak_folder.name, "zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d")
+        children = zaak_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        year_folder = children[0]
+        self.assertEqual(year_folder.name, "2020")
+        children = year_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        month_folder = children[0]
+        self.assertEqual(month_folder.name, "7")
+        children = month_folder.get_children_folders()
+        self.assertEqual(len(children), 1)
+        day_folder = children[0]
+        self.assertEqual(day_folder.name, "27")
+
+        self.assertEqual(day_folder.objectId, document.get_parent_folders()[0].objectId)
+
+    def test_create_besluit_oio_with_linked_document(self, m):
+        # Mocking the retrieval of the Besluit
+        m.get(self.besluit_url, json=self.besluit)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_besluit_url)
+
+        # Mocking the retrieval of the Zaaks
+        m.get(self.zaak_url, json=self.zaak)
+        m.get(self.another_zaak_url, json=self.another_zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktypes
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        m.get(self.another_zaaktype_url, json=self.another_zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Create document
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification="64d15843-1990-4af2-b6c8-d5a0be52402f",
+            data=properties,
+            content=content,
+        )
+
+        # Create an oio linked to this document
+        oio1 = {
+            "object": self.another_zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        self.cmis_client.create_oio(data=oio1)
+
+        # Create a besluit oio to link the same document to a different zaak
+        oio2 = {
+            "object": self.besluit_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "besluit",
+        }
+        self.cmis_client.create_oio(data=oio2)
+
+        # Test that the second folder structure
+        children = self.cmis_client.base_folder.get_children_folders()
+        self.assertEqual(len(children), 3)
+        children_folders_names = [folder.name for folder in children]
+        self.assertIn("zaaktype-Melding Openbare Ruimte-1", children_folders_names)
+        self.assertIn("zaaktype-Melding Openbare Ruimte-2", children_folders_names)
+        for folder in children:
+            if folder.name == "zaaktype-Melding Openbare Ruimte-1":
+                zaaktype_folder = folder
+                break
+
+        zaak_folder = zaaktype_folder.get_children_folders()[0]
+        self.assertEqual(zaak_folder.name, "zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d")
         children = zaak_folder.get_children_folders()
         self.assertEqual(len(children), 1)
         year_folder = children[0]

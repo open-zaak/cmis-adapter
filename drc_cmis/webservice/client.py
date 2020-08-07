@@ -301,10 +301,12 @@ class SOAPCMISClient(SOAPCMISRequest):
         """Create an object Informatieobject and move the related document to the correct folder.
 
         There are 2 possible cases:
-        1. The document is already related to a zaak/besluit: a copy of the document is put in the
+        1. The document is already related to a zaak: a copy of the document is put in the
             correct zaaktype/zaak folder.
         2. The document is not related to anything: the document is moved from the temporary folder
             to the correct zaaktype/zaak folder.
+
+        If the oio creates a link to a besluit, the zaak/zaaktype need to be retrieved from the besluit.
 
         :param data: dict, details of the oio
         :return: ObjectInformatieObject, the created oio
@@ -316,8 +318,14 @@ class SOAPCMISClient(SOAPCMISRequest):
         document = self.get_document(uuid=document_uuid)
 
         # Retrieve the zaak and the zaaktype
-        client_zaak = get_zds_client(data["object"])
-        zaak_data = client_zaak.retrieve("zaak", url=data["object"])
+        if data["object_type"] == "besluit":
+            client_besluit = get_zds_client(data["object"])
+            besluit_data = client_besluit.retrieve("besluit", url=data["object"])
+            zaak_url = besluit_data["zaak"]
+        else:
+            zaak_url = data["object"]
+        client_zaak = get_zds_client(zaak_url)
+        zaak_data = client_zaak.retrieve("zaak", url=zaak_url)
         client_zaaktype = get_zds_client(zaak_data["zaaktype"])
         zaaktype_data = client_zaaktype.retrieve("zaaktype", url=zaak_data["zaaktype"])
 
