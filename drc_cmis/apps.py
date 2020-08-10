@@ -4,7 +4,7 @@ import os
 from django.apps import AppConfig
 from django.conf import settings
 
-from drc_cmis.utils import mapper as mapper
+from drc_cmis.utils import mapper
 from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
