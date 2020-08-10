@@ -65,10 +65,18 @@ class Oio:
 
 @dataclass
 class ZaakFolderData:
+    object_type_id: Id
     url: str
     identificatie: str
     zaaktype: str
     bronorganisatie: str
+
+
+@dataclass
+class ZaakTypeFolderData:
+    object_type_id: Id
+    url: str
+    identificatie: str
 
 
 CONVERTER = {

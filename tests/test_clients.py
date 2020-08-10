@@ -65,9 +65,6 @@ class CMISClientFolderTests(DMSMixin, TestCase):
             "url": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
             "identificatie": "1bcfd0d6-c817-428c-a3f4-4047038c184d",
             "zaaktype": "https://ref.tst.vng.cloud/ztc/api/v1/catalogussen/f7afd156-c8f5-4666-b8b5-28a4a9b5dfc7/zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1",
-            "startdatum": "2023-12-06",
-            "einddatum": None,
-            "registratiedatum": "2019-04-17",
             "bronorganisatie": "509381406",
         }
 
@@ -183,6 +180,10 @@ class CMISClientFolderTests(DMSMixin, TestCase):
         self.assertRaises(
             FolderDoesNotExistError, self.cmis_client.get_folder, folder3.objectId,
         )
+
+    def test_get_vendor(self):
+        vendor = self.cmis_client.vendor
+        self.assertEqual(vendor.lower(), "alfresco")
 
 
 @freeze_time("2020-07-27 12:00:00")

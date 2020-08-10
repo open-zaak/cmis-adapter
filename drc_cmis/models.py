@@ -31,7 +31,7 @@ class CMISConfig(SingletonModel):
     base_folder_name = models.CharField(
         max_length=200,
         default="Zaken",
-        help_text="Name of the DMS base folder in which the documents will be stored. If left empty, no"
+        help_text="Name of the DMS base folder in which the documents will be stored. If left empty, no "
         "base folder will be used.",
     )
 

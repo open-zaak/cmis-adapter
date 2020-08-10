@@ -1,15 +1,18 @@
 {
     "ZAAKTYPE_MAP": {
+        "object_type_id": "cmis:objectTypeId",
         "url": "drc:zaaktype__url",
         "identificatie": "drc:zaaktype__identificatie"
     },
     "ZAAK_MAP": {
+        "object_type_id": "cmis:objectTypeId",
         "url": "drc:zaak__url",
         "identificatie": "drc:zaak__identificatie",
         "zaaktype": "drc:zaak__zaaktypeurl",
         "bronorganisatie": "drc:zaak__bronorganisatie"
     },
     "DOCUMENT_MAP": {
+        "object_type_id": "cmis:objectTypeId",
         "uuid": "cmis:versionSeriesId",
         "bronorganisatie": "drc:document__bronorganisatie",
         "identificatie": "drc:document__identificatie",
@@ -40,12 +43,14 @@
         "kopie_van": "drc:kopie_van"
     },
     "OBJECTINFORMATIEOBJECT_MAP": {
+        "object_type_id": "cmis:objectTypeId",
         "object_type": "drc:oio__object_type",
         "besluit": "drc:oio__besluit",
         "zaak": "drc:oio__zaak",
         "informatieobject": "drc:oio__informatieobject"
     },
     "GEBRUIKSRECHTEN_MAP": {
+        "object_type_id": "cmis:objectTypeId",
         "einddatum": "drc:gebruiksrechten__einddatum",
         "omschrijving_voorwaarden": "drc:gebruiksrechten__omschrijving_voorwaarden",
         "informatieobject": "drc:gebruiksrechten__informatieobject",

@@ -18,6 +18,7 @@ from drc_cmis.utils.utils import get_random_string
 from drc_cmis.webservice.data_models import (
     EnkelvoudigInformatieObject,
     ZaakFolderData,
+    ZaakTypeFolderData,
     get_cmis_type,
 )
 from drc_cmis.webservice.request import SOAPCMISRequest
@@ -123,7 +124,6 @@ class CMISContentObject(CMISBaseObject):
 
 class Document(CMISContentObject):
     table = "drc:document"
-    object_type_id = f"D:{table}"
     name_map = DOCUMENT_MAP
 
     @classmethod
@@ -164,12 +164,6 @@ class Document(CMISContentObject):
                 props[prop_name] = {"value": "", "type": prop_type}
 
         if new:
-            object_type_id = {
-                "value": cls.object_type_id,
-                "type": get_cmis_type(EnkelvoudigInformatieObject, "object_type_id"),
-            }
-            props.setdefault("cmis:objectTypeId", object_type_id)
-
             # increase likelihood of uniqueness of title by appending a random string
             title, suffix = data.get("titel"), get_random_string()
             if title is not None:
@@ -368,13 +362,11 @@ class Document(CMISContentObject):
 
 class Gebruiksrechten(CMISContentObject):
     table = "drc:gebruiksrechten"
-    object_type_id = f"D:{table}"
     name_map = GEBRUIKSRECHTEN_MAP
 
 
 class ObjectInformatieObject(CMISContentObject):
     table = "drc:oio"
-    object_type_id = f"D:{table}"
     name_map = OBJECTINFORMATIEOBJECT_MAP
 
 
@@ -421,10 +413,38 @@ class ZaakTypeFolder(CMISBaseObject):
     table = "drc:zaaktypefolder"
     name_map = ZAAKTYPE_MAP
 
+    @classmethod
+    def build_properties(cls, data: dict) -> dict:
+        """Construct property dictionary.
+
+        The structure of the dictionary is (where ``property_name``, ``property_value``
+        and ``property_type`` are the name, value and type of the property):
+
+            .. code-block:: python
+
+                properties = {
+                    "property_name": {
+                        "value": property_value,
+                        "type": property_type,
+                    }
+                }
+        """
+
+        props = {}
+        for key, value in data.items():
+            prop_name = mapper(key, type="zaaktype")
+            if not prop_name:
+                logger.debug("No property name found for key '%s'", key)
+                continue
+            if value is not None:
+                prop_type = get_cmis_type(ZaakTypeFolderData, key)
+                props[prop_name] = {"value": str(value), "type": prop_type}
+
+        return props
+
 
 class ZaakFolder(CMISBaseObject):
     table = "drc:zaakfolder"
-    object_type_id = "F:drc:zaakfolder"
     name_map = ZAAK_MAP
 
     @classmethod
@@ -445,22 +465,13 @@ class ZaakFolder(CMISBaseObject):
         """
 
         props = {}
-
-        object_type_id = {
-            "value": cls.object_type_id,
-            "type": "propertyId",
-        }
-        props.setdefault("cmis:objectTypeId", object_type_id)
-
         for key, value in data.items():
-            prop_name = mapper(key, type="zaakfolder")
+            prop_name = mapper(key, type="zaak")
             if not prop_name:
                 logger.debug("No property name found for key '%s'", key)
                 continue
             if value is not None:
                 prop_type = get_cmis_type(ZaakFolderData, key)
-                if isinstance(value, datetime.date) or isinstance(value, datetime.date):
-                    value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
                 props[prop_name] = {"value": str(value), "type": prop_type}
 
         return props

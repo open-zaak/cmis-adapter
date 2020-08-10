@@ -36,6 +36,7 @@ from drc_cmis.webservice.drc_document import (
     Gebruiksrechten,
     ObjectInformatieObject,
     ZaakFolder,
+    ZaakTypeFolder,
 )
 from drc_cmis.webservice.request import SOAPCMISRequest
 from drc_cmis.webservice.utils import (
@@ -115,6 +116,28 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         xml_response = extract_xml_from_soap(soap_response)
         return extract_repo_info_from_xml(xml_response)
+
+    @property
+    def vendor(self) -> str:
+        repo_info = self.get_repository_info()
+        return repo_info["vendorName"]
+
+    def get_object_type_id_prefix(self, object_type: str) -> str:
+        """Get the prefix for the cmis:objectTypeId.
+
+        Alfresco requires prefixes for create statements of custom objects.
+        https://stackoverflow.com/a/28322276/7146757
+
+        :param object_type: str, the type of the object
+        :return: str, the prefix (F: or D:)
+        """
+        if self.vendor.lower() == "alfresco":
+            if object_type in ["zaaktypefolder", "zaakfolder"]:
+                return "F:"
+            if object_type in ["document", "oio", "gebruiksrechten"]:
+                return "D:"
+
+        return ""
 
     def query(
         self, return_type_name: str, lhs: List[str], rhs: List[str]
@@ -198,20 +221,11 @@ class SOAPCMISClient(SOAPCMISRequest):
         :param zaaktype: dict, contains the properties of the zaaktype
         :return: Folder
         """
-        properties = {
-            "cmis:objectTypeId": {
-                "value": "F:drc:zaaktypefolder",
-                "type": "propertyId",
-            },
-            mapper("url", "zaaktype"): {
-                "value": zaaktype.get("url"),
-                "type": "propertyString",
-            },
-            mapper("identificatie", "zaaktype"): {
-                "value": str(zaaktype.get("identificatie")),
-                "type": "propertyString",
-            },
-        }
+        zaaktype.setdefault(
+            "object_type_id",
+            f"{self.get_object_type_id_prefix('zaaktypefolder')}drc:zaaktypefolder",
+        )
+        properties = ZaakTypeFolder.build_properties(zaaktype)
 
         folder_name = (
             f"zaaktype-{zaaktype.get('omschrijving')}-{zaaktype.get('identificatie')}"
@@ -225,6 +239,11 @@ class SOAPCMISClient(SOAPCMISRequest):
         """
         Create a folder with the prefix 'zaak-' to make a zaak folder
         """
+
+        zaak.setdefault(
+            "object_type_id",
+            f"{self.get_object_type_id_prefix('zaakfolder')}drc:zaakfolder",
+        )
         properties = ZaakFolder.build_properties(zaak)
 
         return self.get_or_create_folder(
@@ -380,7 +399,9 @@ class SOAPCMISClient(SOAPCMISRequest):
         # copy the properties from the source document
         drc_properties = {}
         for property_name, property_details in document.properties.items():
-            if "cmis:" not in property_name and property_details["value"] is not None:
+            if (
+                "cmis:" not in property_name and property_details["value"] is not None
+            ) or property_name == "cmis:objectTypeId":
                 drc_properties[
                     reverse_mapper(property_name, type="document")
                 ] = property_details["value"]
@@ -476,7 +497,11 @@ class SOAPCMISClient(SOAPCMISRequest):
                 properties[prop_name] = {"value": value, "type": prop_type}
 
         properties.setdefault(
-            "cmis:objectTypeId", {"value": f"D:drc:{object_type}", "type": "propertyId"}
+            "cmis:objectTypeId",
+            {
+                "value": f"{self.get_object_type_id_prefix(object_type)}drc:{object_type}",
+                "type": "propertyId",
+            },
         )
         properties.setdefault(
             "cmis:name", {"value": get_random_string(), "type": "propertyString"}
@@ -593,6 +618,10 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         now = datetime.datetime.now()
         data.setdefault("versie", "1")
+        data.setdefault(
+            "object_type_id",
+            f"{self.get_object_type_id_prefix('document')}drc:document",
+        )
 
         content_id = str(uuid.uuid4())
         if content is None:

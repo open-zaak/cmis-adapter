@@ -109,7 +109,6 @@ class CMISContentObject(CMISBaseObject):
 
 class Document(CMISContentObject):
     table = "drc:document"
-    object_type_id = f"D:{table}"
     name_map = DOCUMENT_MAP
 
     @classmethod
@@ -130,8 +129,6 @@ class Document(CMISContentObject):
             props[prop_name] = value
 
         if new:
-            props.setdefault("cmis:objectTypeId", cls.object_type_id)
-
             # increase likelihood of uniqueness of title by appending a random string
             title, suffix = data.get("titel"), get_random_string()
             if title is not None:
@@ -272,13 +269,11 @@ class Document(CMISContentObject):
 
 class Gebruiksrechten(CMISContentObject):
     table = "drc:gebruiksrechten"
-    object_type_id = f"D:{table}"
     name_map = GEBRUIKSRECHTEN_MAP
 
 
 class ObjectInformatieObject(CMISContentObject):
     table = "drc:oio"
-    object_type_id = f"D:{table}"
     name_map = OBJECTINFORMATIEOBJECT_MAP
 
 

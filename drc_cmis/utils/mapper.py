@@ -1,9 +1,11 @@
 ZAAKTYPE_MAP = {
+    "object_type_id": None,
     "url": None,
     "identificatie": None,
 }
 
 ZAAK_MAP = {
+    "object_type_id": None,
     "url": None,
     "identificatie": None,
     "zaaktype": None,
@@ -11,6 +13,7 @@ ZAAK_MAP = {
 }
 
 DOCUMENT_MAP = {
+    "object_type_id": None,
     "uuid": None,
     "identificatie": None,
     "bronorganisatie": None,
@@ -43,6 +46,7 @@ DOCUMENT_MAP = {
 }
 
 GEBRUIKSRECHTEN_MAP = {
+    "object_type_id": None,
     "informatieobject": None,
     "omschrijving_voorwaarden": None,
     "startdatum": None,
@@ -50,6 +54,7 @@ GEBRUIKSRECHTEN_MAP = {
 }
 
 OBJECTINFORMATIEOBJECT_MAP = {
+    "object_type_id": None,
     "informatieobject": None,
     "object_type": None,
     "zaak": None,

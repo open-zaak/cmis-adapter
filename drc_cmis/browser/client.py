@@ -97,6 +97,28 @@ class CMISDRCClient(CMISRequest):
         elif type_name == "zaakfolder":
             return ZaakFolder
 
+    @property
+    def vendor(self) -> str:
+        repo_info = self.get_request(self.base_url)
+        return repo_info["-default-"]["vendorName"]
+
+    def get_object_type_id_prefix(self, object_type: str) -> str:
+        """Get the prefix for the cmis:objectTypeId.
+
+        Alfresco requires prefixes for create statements of custom objects.
+        https://stackoverflow.com/a/28322276/7146757
+
+        :param object_type: str, the type of the object
+        :return: str, the prefix (F: or D:)
+        """
+        if self.vendor.lower() == "alfresco":
+            if object_type in ["zaaktypefolder", "zaakfolder"]:
+                return "F:"
+            if object_type in ["document", "oio", "gebruiksrechten"]:
+                return "D:"
+
+        return ""
+
     # generic querying
     def query(self, return_type_name: str, lhs: List[str], rhs: List[str]):
         return_type = self.get_return_type(return_type_name)
@@ -140,7 +162,7 @@ class CMISDRCClient(CMISRequest):
         """
         logger.debug("CMIS_CLIENT: get_or_create_zaaktype_folder")
         properties = {
-            "cmis:objectTypeId": "F:drc:zaaktypefolder",
+            "cmis:objectTypeId": f"{self.get_object_type_id_prefix('zaaktypefolder')}drc:zaaktypefolder",
             mapper("url", "zaaktype"): zaaktype.get("url"),
             mapper("identificatie", "zaaktype"): zaaktype.get("identificatie"),
         }
@@ -159,7 +181,7 @@ class CMISDRCClient(CMISRequest):
         """
         logger.debug("CMIS_CLIENT: get_or_create_zaak_folder")
         properties = {
-            "cmis:objectTypeId": "F:drc:zaakfolder",
+            "cmis:objectTypeId": f"{self.get_object_type_id_prefix('zaakfolder')}drc:zaakfolder",
             mapper("url", "zaak"): zaak.get("url"),
             mapper("identificatie", "zaak"): zaak.get("identificatie"),
             mapper("zaaktype", "zaak"): zaak.get("zaaktype"),
@@ -348,7 +370,9 @@ class CMISDRCClient(CMISRequest):
         if "cmis:objectTypeId" in properties.keys():
             json_data["propertyValue[1]"] = properties.pop("cmis:objectTypeId")
         else:
-            json_data["propertyValue[1]"] = f"D:drc:{object_type}"
+            json_data[
+                "propertyValue[1]"
+            ] = f"{self.get_object_type_id_prefix(object_type)}drc:{object_type}"
 
         prop_count = 2
         for prop_key, prop_value in properties.items():
@@ -432,6 +456,10 @@ class CMISDRCClient(CMISRequest):
 
         now = timezone.now()
         data.setdefault("versie", 1)
+        data.setdefault(
+            "object_type_id",
+            f"{self.get_object_type_id_prefix('document')}drc:document",
+        )
 
         if content is None:
             content = BytesIO()

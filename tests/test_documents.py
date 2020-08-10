@@ -18,7 +18,7 @@ from .mixins import DMSMixin
 class CMISDocumentTests(DMSMixin, TestCase):
     @skipIf(
         os.getenv("CMIS_BINDING") != "WEBSERVICE",
-        "The properties are builts differently with different bindings",
+        "The properties are built differently with different bindings",
     )
     def test_build_properties_webservice(self):
         properties = {
@@ -58,7 +58,7 @@ class CMISDocumentTests(DMSMixin, TestCase):
 
     @skipIf(
         os.getenv("CMIS_BINDING") != "BROWSER",
-        "The properties are builts differently with different bindings",
+        "The properties are built differently with different bindings",
     )
     def test_build_properties_browser(self):
         properties = {
@@ -519,3 +519,68 @@ class CMISFolderTests(DMSMixin, TestCase):
             self.cmis_client.get_folder(test_folder1.objectId)
             self.cmis_client.get_folder(test_folder2.objectId)
             self.cmis_client.get_folder(test_folder3.objectId)
+
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "WEBSERVICE",
+        "The properties are built differently with different bindings",
+    )
+    def test_build_zaakfolder_properties_webservice(self):
+
+        from drc_cmis.webservice.drc_document import ZaakFolder
+
+        properties = {
+            "object_type_id": "F:drc:zaakfolder",
+            "url": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            "identificatie": "1bcfd0d6-c817-428c-a3f4-4047038c184d",
+            "zaaktype": "https://ref.tst.vng.cloud/ztc/api/v1/catalogussen/f7afd156-c8f5-4666-b8b5-28a4a9b5dfc7/zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1",
+            "bronorganisatie": "509381406",
+        }
+
+        built_properties = ZaakFolder.build_properties(data=properties)
+
+        self.assertIn("cmis:objectTypeId", built_properties)
+
+        for prop_name, prop_dict in built_properties.items():
+            self.assertIn("type", prop_dict)
+            self.assertIn("value", prop_dict)
+
+            if prop_name.split("__")[-1] in properties:
+                converted_prop_name = prop_name.split("__")[-1]
+                self.assertEqual(properties[converted_prop_name], prop_dict["value"])
+
+        self.assertEqual(
+            built_properties["cmis:objectTypeId"]["value"], "F:drc:zaakfolder"
+        )
+        self.assertEqual(built_properties["cmis:objectTypeId"]["type"], "propertyId")
+
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "WEBSERVICE",
+        "The properties are built differently with different bindings",
+    )
+    def test_build_zaaktypefolder_properties_webservice(self):
+
+        from drc_cmis.webservice.drc_document import ZaakTypeFolder
+
+        properties = {
+            "object_type_id": "F:drc:zaaktypefolder",
+            "url": "https://ref.tst.vng.cloud/zrc/api/v1/zaken/random-zaak-uuid",
+            "identificatie": "1bcfd0d6-c817-428c-a3f4-4047038c184d",
+            "omschrijving": "Melding Openbare Ruimte",
+        }
+
+        built_properties = ZaakTypeFolder.build_properties(data=properties)
+
+        self.assertIn("cmis:objectTypeId", built_properties)
+
+        for prop_name, prop_dict in built_properties.items():
+            self.assertIn("type", prop_dict)
+            self.assertIn("value", prop_dict)
+
+            if prop_name.split("__")[-1] in properties:
+                converted_prop_name = prop_name.split("__")[-1]
+                self.assertEqual(properties[converted_prop_name], prop_dict["value"])
+
+        self.assertEqual(
+            built_properties["cmis:objectTypeId"]["value"], "F:drc:zaaktypefolder"
+        )
+        self.assertEqual(built_properties["cmis:objectTypeId"]["type"], "propertyId")
