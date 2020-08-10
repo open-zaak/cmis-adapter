@@ -1,3 +1,4 @@
+import datetime
 import io
 import os
 import uuid
@@ -747,6 +748,155 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         self.assertTrue(copied_document_was_retrieved)
         self.assertEqual(copied_document.kopie_van, document.uuid)
 
+
+@freeze_time("2020-07-27 12:00:00")
+@requests_mock.Mocker(real_http=True)  # real HTTP for the Alfresco requests
+class CMISClientGebruiksrechtenTests(DMSMixin, TestCase):
+    base_zaak_url = "https://testserver/api/v1/"
+    base_zaaktype_url = "https://anotherserver/ztc/api/v1/"
+    base_doc_url = "https://yetanotherserver/drc/api/v1/"
+
+    zaak_url = f"{base_zaak_url}zaken/1c8e36be-338c-4c07-ac5e-1adf55bec04a"
+    zaak = {
+        "url": zaak_url,
+        "identificatie": "1bcfd0d6-c817-428c-a3f4-4047038c184d",
+        "zaaktype": f"{base_zaaktype_url}zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1",
+        "startdatum": "2023-12-06",
+        "einddatum": None,
+        "registratiedatum": "2019-04-17",
+        "bronorganisatie": "509381406",
+    }
+
+    zaaktype_url = f"{base_zaaktype_url}zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1"
+    zaaktype = {
+        "url": zaaktype_url,
+        "identificatie": 1,
+        "omschrijving": "Melding Openbare Ruimte",
+    }
+
+    another_zaak_url = f"{base_zaak_url}zaken/305e7c70-8a11-4321-80cc-e60498090fab"
+    another_zaak = {
+        "url": another_zaak_url,
+        "identificatie": "1717b1f0-16e5-42d4-ba28-cbce211bb94b",
+        "zaaktype": f"{base_zaaktype_url}zaaktypen/951172cc-9b59-4346-b4be-d3a4e1c3c0f1",
+        "startdatum": "2023-12-06",
+        "einddatum": None,
+        "registratiedatum": "2019-04-17",
+        "bronorganisatie": "509381406",
+    }
+
+    another_zaaktype_url = (
+        f"{base_zaaktype_url}zaaktypen/951172cc-9b59-4346-b4be-d3a4e1c3c0f1"
+    )
+    another_zaaktype = {
+        "url": another_zaaktype_url,
+        "identificatie": 2,
+        "omschrijving": "Melding Openbare Ruimte",
+    }
+
+    def test_create_gebruiksrechten_with_unlinked_document(self, m):
+        # Creating the document in the temporary folder
+        identification = str(uuid.uuid4())
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties, content=content,
+        )
+
+        # Create gebruiksrechten
+        gebruiksrechten_data = {
+            "informatieobject": f"{self.base_doc_url}documenten/api/v1/enkelvoudiginformatieobjecten/{document.uuid}",
+            "startdatum": "2018-12-24T00:00:00Z",
+            "omschrijving_voorwaarden": "Een hele set onredelijke voorwaarden",
+        }
+
+        gebruiksrechten = self.cmis_client.create_content_object(
+            data=gebruiksrechten_data, object_type="gebruiksrechten"
+        )
+
+        # Test that the gebruiksrechten is in the temporary folder
+        children = self.cmis_client.base_folder.get_children_folders()
+        year_folder = children[0]
+        children = year_folder.get_children_folders()
+        month_folder = children[0]
+        children = month_folder.get_children_folders()
+        day_folder = children[0]
+        children = day_folder.get_children_folders()
+        related_data_folder = children[0]
+
+        self.assertEqual(
+            related_data_folder.objectId,
+            gebruiksrechten.get_parent_folders()[0].objectId,
+        )
+
+        # Test that the properties are correctly set
+        eio_url = f"{self.base_doc_url}documenten/api/v1/enkelvoudiginformatieobjecten/{document.uuid}"
+        self.assertEqual(gebruiksrechten.informatieobject, eio_url)
+        self.assertEqual(
+            gebruiksrechten.startdatum,
+            datetime.datetime.strptime("2018-12-24T00:00:00Z", "%Y-%m-%dT%H:%M:%S%z"),
+        )
+        self.assertEqual(
+            gebruiksrechten.omschrijving_voorwaarden,
+            "Een hele set onredelijke voorwaarden",
+        )
+
+    # TODO
+    def test_create_gebruiksrechten_with_linked_document(self, m):
+        pass
+
+    # TODO
+    def test_link_document_with_existing_gebruiksrechten(self, m):
+        # Mocking the retrieval of the Zaak
+        m.get(self.zaak_url, json=self.zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktype
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        identification = str(uuid.uuid4())
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties, content=content,
+        )
+
+        # Creating the oio moves the document to the zaak folder
+        oio = {
+            "object": self.zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        self.cmis_client.create_oio(oio)
+
+        # TODO Test where the gebruiksrechten should be
+        pass
 
 @freeze_time("2020-07-27 12:00:00")
 class CMISClientDocumentTests(DMSMixin, TestCase):
