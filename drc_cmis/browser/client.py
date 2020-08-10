@@ -48,16 +48,19 @@ class CMISDRCClient(CMISRequest):
     @property
     def base_folder(self) -> Folder:
         if not self._base_folder:
-            base = self.get_request(self.root_folder_url)
-            for folder_response in base.get("objects"):
-                folder = Folder(folder_response["object"])
-                if folder.name == self.base_folder_name:
-                    self._base_folder = folder
-                    break
-            if not self._base_folder:
-                self._base_folder = self.create_folder(
-                    name=self.base_folder_name, parent_id=self.root_folder_id
-                )
+            if self.base_folder_name == "":
+                self._base_folder = self.get_folder(self.root_folder_id)
+            else:
+                base = self.get_request(self.root_folder_url)
+                for folder_response in base.get("objects"):
+                    folder = Folder(folder_response["object"])
+                    if folder.name == self.base_folder_name:
+                        self._base_folder = folder
+                        break
+                if not self._base_folder:
+                    self._base_folder = self.create_folder(
+                        name=self.base_folder_name, parent_id=self.root_folder_id
+                    )
         return self._base_folder
 
     @property
@@ -65,7 +68,7 @@ class CMISDRCClient(CMISRequest):
         """Returns the objectId of the root folder"""
         if self._root_folder_id is None:
             repository_info = self.get_request(self.base_url)
-            self._root_folder_id = f"workspace://SpacesStore/{repository_info['-default-']['rootFolderId']}"
+            self._root_folder_id = repository_info["-default-"]["rootFolderId"]
 
         return self._root_folder_id
 

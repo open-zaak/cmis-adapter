@@ -10,6 +10,7 @@ from django.utils import timezone
 import requests_mock
 from freezegun import freeze_time
 
+from drc_cmis.models import CMISConfig
 from drc_cmis.utils.exceptions import (
     DocumentDoesNotExistError,
     DocumentExistsError,
@@ -182,6 +183,27 @@ class CMISClientFolderTests(DMSMixin, TestCase):
         self.assertRaises(
             FolderDoesNotExistError, self.cmis_client.get_folder, folder3.objectId,
         )
+
+
+@freeze_time("2020-07-27 12:00:00")
+class CMISClientBaseFolderTests(DMSMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        config = CMISConfig.objects.get()
+        config.base_folder_name = ""
+        config.save()
+
+    def test_no_base_folder(self):
+
+        self.assertIs(self.cmis_client._base_folder, None)
+
+        # Getting the the base folder should return the root folder, since no base folder name was given in the
+        # configuration
+        base_folder = self.cmis_client.base_folder
+
+        # Browser binding returns objectId's as "951172cc-9b59-4346-b4be-d3a4e1c3c0f1"
+        # while web service binding returns objectId's as "workspace://SpacesStore/951172cc-9b59-4346-b4be-d3a4e1c3c0f1"
+        self.assertEqual(base_folder.objectId, self.cmis_client.root_folder_id)
 
 
 @freeze_time("2020-07-27 12:00:00")
@@ -897,6 +919,7 @@ class CMISClientGebruiksrechtenTests(DMSMixin, TestCase):
 
         # TODO Test where the gebruiksrechten should be
         pass
+
 
 @freeze_time("2020-07-27 12:00:00")
 class CMISClientDocumentTests(DMSMixin, TestCase):

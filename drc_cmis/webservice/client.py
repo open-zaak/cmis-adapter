@@ -59,39 +59,46 @@ class SOAPCMISClient(SOAPCMISRequest):
         """Return the base folder"""
 
         if self._base_folder is None:
-            query = CMISQuery("SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
-
-            soap_envelope = make_soap_envelope(
-                auth=(self.user, self.password),
-                repository_id=self.main_repo_id,
-                statement=query(str(self.root_folder_id)),
-                cmis_action="query",
-            )
-
-            soap_response = self.request(
-                "DiscoveryService", soap_envelope=soap_envelope.toxml()
-            )
-            xml_response = extract_xml_from_soap(soap_response)
-            num_items = extract_num_items(xml_response)
-            if num_items > 0:
-                extracted_data = extract_object_properties_from_xml(
-                    xml_response, "query"
+            # If no base folder has been specified, all the documents/folders will be created in the root folder
+            if self.base_folder_name == "":
+                # root_folder_id is in the form workspace://SpacesStore/<uuid>
+                self._base_folder = self.get_folder(
+                    uuid=self.root_folder_id.split("/")[-1]
                 )
-                folders = [Folder(data) for data in extracted_data]
             else:
-                folders = []
+                query = CMISQuery("SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
 
-            # Check if the base folder has already been created
-            for folder in folders:
-                if folder.name == self.base_folder_name:
-                    self._base_folder = folder
-                    break
-
-            # If the base folder hasn't been created yet, create it
-            if self._base_folder is None:
-                self._base_folder = self.create_folder(
-                    self.base_folder_name, self.root_folder_id
+                soap_envelope = make_soap_envelope(
+                    auth=(self.user, self.password),
+                    repository_id=self.main_repo_id,
+                    statement=query(str(self.root_folder_id)),
+                    cmis_action="query",
                 )
+
+                soap_response = self.request(
+                    "DiscoveryService", soap_envelope=soap_envelope.toxml()
+                )
+                xml_response = extract_xml_from_soap(soap_response)
+                num_items = extract_num_items(xml_response)
+                if num_items > 0:
+                    extracted_data = extract_object_properties_from_xml(
+                        xml_response, "query"
+                    )
+                    folders = [Folder(data) for data in extracted_data]
+                else:
+                    folders = []
+
+                # Check if the base folder has already been created
+                for folder in folders:
+                    if folder.name == self.base_folder_name:
+                        self._base_folder = folder
+                        break
+
+                # If the base folder hasn't been created yet, create it
+                if self._base_folder is None:
+                    self._base_folder = self.create_folder(
+                        self.base_folder_name, self.root_folder_id
+                    )
 
         return self._base_folder
 
