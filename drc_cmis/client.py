@@ -92,8 +92,20 @@ class CMISClient:
         return self.create_folder(name, parent.objectId, properties)
 
     def delete_cmis_folders_in_base(self):
-        """Deletest the base folder and all its contents"""
-        self.base_folder.delete_tree()
+        """Deletes all the folders in the base folder
+
+        There are 2 cases:
+        1. The base folder is the root folder: all the folders in the
+        root folder are deleted (but not the root folder itself)
+        2. The base folder is a child of the root folder: the base folder is deleted.
+        """
+        # Case 2
+        if self.base_folder_name != "":
+            self.base_folder.delete_tree()
+        # Case 1
+        else:
+            for folder in self.base_folder.get_children_folders():
+                folder.delete_tree()
 
     def create_oio(self, data: dict) -> ObjectInformatieObject:
         """Create ObjectInformatieObject which relates a document with a zaak or besluit

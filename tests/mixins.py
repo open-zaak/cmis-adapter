@@ -33,5 +33,4 @@ class DMSMixin:
         self.cmis_client._base_folder = None
 
     def _removeTree(self):
-        base_folder = self.cmis_client.base_folder
-        base_folder.delete_tree()
+        self.cmis_client.delete_cmis_folders_in_base()

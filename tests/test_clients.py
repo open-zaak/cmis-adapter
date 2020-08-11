@@ -187,7 +187,7 @@ class CMISClientFolderTests(DMSMixin, TestCase):
 
 
 @freeze_time("2020-07-27 12:00:00")
-class CMISClientBaseFolderTests(DMSMixin, TestCase):
+class CMISClientNoBaseFolderTests(DMSMixin, TestCase):
     def setUp(self):
         super().setUp()
         config = CMISConfig.objects.get()
@@ -205,6 +205,33 @@ class CMISClientBaseFolderTests(DMSMixin, TestCase):
         # Browser binding returns objectId's as "951172cc-9b59-4346-b4be-d3a4e1c3c0f1"
         # while web service binding returns objectId's as "workspace://SpacesStore/951172cc-9b59-4346-b4be-d3a4e1c3c0f1"
         self.assertEqual(base_folder.objectId, self.cmis_client.root_folder_id)
+
+    def test_delete_base_tree(self):
+        base_folder = self.cmis_client.base_folder
+
+        children_before = base_folder.get_children_folders()
+        folder1 = self.cmis_client.create_folder("TestFolder1", base_folder.objectId)
+        folder2 = self.cmis_client.create_folder("TestFolder2", base_folder.objectId)
+        folder3 = self.cmis_client.create_folder("TestFolder3", base_folder.objectId)
+
+        children_after = base_folder.get_children_folders()
+        self.assertEqual(len(children_after), 3 + len(children_before))
+
+        self.cmis_client.delete_cmis_folders_in_base()
+
+        self.assertEqual(
+            self.cmis_client.base_folder.objectId, self.cmis_client.root_folder_id
+        )
+
+        self.assertRaises(
+            FolderDoesNotExistError, self.cmis_client.get_folder, folder1.objectId,
+        )
+        self.assertRaises(
+            FolderDoesNotExistError, self.cmis_client.get_folder, folder2.objectId,
+        )
+        self.assertRaises(
+            FolderDoesNotExistError, self.cmis_client.get_folder, folder3.objectId,
+        )
 
 
 @freeze_time("2020-07-27 12:00:00")
