@@ -15,6 +15,7 @@ class DMSMixin:
                 binding="BROWSER",
                 client_user="admin",
                 client_password="admin",
+                base_folder_name="Zaken",
             )
         elif os.getenv("CMIS_BINDING") == "WEBSERVICE":
             CMISConfig.objects.create(
@@ -22,6 +23,7 @@ class DMSMixin:
                 binding="WEBSERVICE",
                 client_user="admin",
                 client_password="admin",
+                base_folder_name="Zaken",
             )
 
     def setUp(self):
