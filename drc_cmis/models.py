@@ -1,5 +1,6 @@
 from django.db import models
 
+from djchoices import ChoiceItem, DjangoChoices
 from solo.models import SingletonModel
 
 
@@ -30,7 +31,7 @@ class CMISConfig(SingletonModel):
     )
     base_folder_name = models.CharField(
         max_length=200,
-        default="Zaken",
+        default="",
         help_text="Name of the DMS base folder in which the documents will be stored. If left empty, no "
         "base folder will be used.",
     )
@@ -40,3 +41,7 @@ class CMISConfig(SingletonModel):
 
     class Meta:
         verbose_name = "CMIS Configuration"
+
+
+class Vendor(DjangoChoices):
+    alfresco = ChoiceItem()

@@ -19,6 +19,7 @@ from drc_cmis.browser.drc_document import (
 )
 from drc_cmis.browser.request import CMISRequest
 from drc_cmis.browser.utils import create_json_request_body
+from drc_cmis.models import Vendor
 from drc_cmis.utils.exceptions import (
     CmisUpdateConflictException,
     DocumentConflictException,
@@ -111,7 +112,7 @@ class CMISDRCClient(CMISRequest):
         :param object_type: str, the type of the object
         :return: str, the prefix (F: or D:)
         """
-        if self.vendor.lower() == "alfresco":
+        if self.vendor.lower() == Vendor.alfresco:
             if object_type in ["zaaktypefolder", "zaakfolder"]:
                 return "F:"
             if object_type in ["document", "oio", "gebruiksrechten"]:
