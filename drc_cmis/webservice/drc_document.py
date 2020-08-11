@@ -17,6 +17,7 @@ from drc_cmis.utils.query import CMISQuery
 from drc_cmis.utils.utils import get_random_string
 from drc_cmis.webservice.data_models import (
     EnkelvoudigInformatieObject,
+    Gebruiksrechten as GebruiksrechtenDoc,
     ZaakFolderData,
     ZaakTypeFolderData,
     get_cmis_type,
@@ -363,6 +364,37 @@ class Document(CMISContentObject):
 class Gebruiksrechten(CMISContentObject):
     table = "drc:gebruiksrechten"
     name_map = GEBRUIKSRECHTEN_MAP
+
+    @classmethod
+    def build_properties(cls, data: dict) -> dict:
+        """Construct property dictionary.
+
+        The structure of the dictionary is (where ``property_name``, ``property_value``
+        and ``property_type`` are the name, value and type of the property):
+
+            .. code-block:: python
+
+                properties = {
+                    "property_name": {
+                        "value": property_value,
+                        "type": property_type,
+                    }
+                }
+        """
+
+        props = {}
+        for key, value in data.items():
+            prop_name = mapper(key, type="gebruiksrechten")
+            if not prop_name:
+                logger.debug("No property name found for key '%s'", key)
+                continue
+            if value is not None:
+                prop_type = get_cmis_type(GebruiksrechtenDoc, key)
+                if isinstance(value, datetime.date) or isinstance(value, datetime.date):
+                    value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                props[prop_name] = {"value": str(value), "type": prop_type}
+
+        return props
 
 
 class ObjectInformatieObject(CMISContentObject):

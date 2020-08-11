@@ -243,6 +243,8 @@ class CMISDRCClient(CMISRequest):
 
         If the oio creates a link to a besluit, the zaak/zaaktype need to be retrieved from the besluit.
 
+        If the document is linked already to a gebruiks rechten, then the gebruiksrechten object is also moved.
+
         :param data: dict, the oio details.
         :return: Oio created
         """
@@ -284,17 +286,87 @@ class CMISDRCClient(CMISRequest):
             rhs=[data.get("informatieobject")],
         )
 
+        # Check if there are gebruiksrechten related to the document
+        related_gebruiksrechten = self.query(
+            return_type_name="gebruiksrechten",
+            lhs=["drc:gebruiksrechten__informatieobject = '%s'"],
+            rhs=[data.get("informatieobject")],
+        )
+
         # Case 1: Already related to a zaak. Copy the document to the destination folder.
         if len(retrieved_oios) > 0:
             self.copy_document(document, day_folder)
+            if len(related_gebruiksrechten) > 0:
+                for gebruiksrechten in related_gebruiksrechten:
+                    self.copy_gebruiksrechten(gebruiksrechten, related_data_folder)
         # Case 2: Not related to a zaak. Move the document to the destination folder
         else:
             document.move_object(day_folder)
+            if len(related_gebruiksrechten) > 0:
+                for gebruiksrechten in related_gebruiksrechten:
+                    gebruiksrechten.move_object(related_data_folder)
 
         # Create the Oio in a separate folder
         return self.create_content_object(
             data=data, object_type="oio", destination_folder=related_data_folder
         )
+
+    def create_gebruiksrechten(self, data: dict) -> Gebruiksrechten:
+        """Create gebruiksrechten
+
+        The geburiksrechten is created in the 'Related data' folder in the folder
+        of the related document
+
+        :param data: dict, data of the gebruiksrechten
+        :return: Gebruiksrechten
+        """
+
+        document_uuid = data.get("informatieobject").split("/")[-1]
+        document = self.get_document(uuid=document_uuid)
+
+        parent_folder = document.get_parent_folders()[0]
+        related_data_folder = self.get_or_create_folder("Related data", parent_folder)
+
+        return self.create_content_object(
+            data=data,
+            object_type="gebruiksrechten",
+            destination_folder=related_data_folder,
+        )
+
+    def copy_gebruiksrechten(
+        self, source_object: Gebruiksrechten, destination_folder: Folder
+    ) -> Gebruiksrechten:
+        """Copy a gebruiksrechten to a folder
+
+        :param source_object: Gebruiksrechten, the gebruiksrechten to copy
+        :param destination_folder: Folder, the folder in which to place the copied gebruiksrechten
+        :return: the copied object
+        """
+        logger.debug("Gebruiksrechten (Browser binding): make_copy")
+
+        # copy the properties from the source object
+        properties = {
+            property_name: property_details["value"]
+            for property_name, property_details in source_object.properties.items()
+            if "cmis:" not in property_name
+        }
+
+        file_name = get_random_string()
+
+        properties.update(
+            **{
+                "cmis:objectTypeId": source_object.objectTypeId,
+                "cmis:name": file_name,
+                mapper(
+                    "kopie_van", type="gebruiksrechten"
+                ): source_object.objectId,  # Keep tack of where this is copied from.
+            }
+        )
+
+        data = create_json_request_body(destination_folder, properties)
+
+        json_response = self.post_request(self.root_folder_url, data=data)
+        return Gebruiksrechten(json_response)
 
     def copy_document(self, document: Document, destination_folder: Folder) -> Document:
         """Copy document to a folder

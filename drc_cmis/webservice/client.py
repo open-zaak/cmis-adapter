@@ -176,20 +176,21 @@ class SOAPCMISClient(SOAPCMISRequest):
         :return: type, string, either Folder, Document, Oio or Gebruiksrechten
         """
         error_message = f"No class {type_name} exists for this client."
+        type_name = type_name.lower()
         assert type_name in [
-            "Folder",
-            "Document",
-            "Gebruiksrechten",
-            "Oio",
+            "folder",
+            "document",
+            "gebruiksrechten",
+            "oio",
         ], error_message
 
-        if type_name == "Folder":
+        if type_name == "folder":
             return Folder
-        elif type_name == "Document":
+        elif type_name == "document":
             return Document
-        elif type_name == "Gebruiksrechten":
+        elif type_name == "gebruiksrechten":
             return Gebruiksrechten
-        elif type_name == "Oio":
+        elif type_name == "oio":
             return ObjectInformatieObject
 
     def get_all_versions(self, document: Document) -> List[Document]:
@@ -334,6 +335,8 @@ class SOAPCMISClient(SOAPCMISRequest):
 
         If the oio creates a link to a besluit, the zaak/zaaktype need to be retrieved from the besluit.
 
+        If the document is linked already to a gebruiks rechten, then the gebruiksrechten object is also moved.
+
         :param data: dict, details of the oio
         :return: ObjectInformatieObject, the created oio
         """
@@ -375,12 +378,25 @@ class SOAPCMISClient(SOAPCMISRequest):
             rhs=[data.get("informatieobject")],
         )
 
+        # Check if there are gebruiksrechten related to the document
+        related_gebruiksrechten = self.query(
+            return_type_name="gebruiksrechten",
+            lhs=["drc:gebruiksrechten__informatieobject = '%s'"],
+            rhs=[data.get("informatieobject")],
+        )
+
         # Case 1: Already related to a zaak. Copy the document to the destination folder.
         if len(retrieved_oios) > 0:
             self.copy_document(document, day_folder)
+            if len(related_gebruiksrechten) > 0:
+                for gebruiksrechten in related_gebruiksrechten:
+                    self.copy_gebruiksrechten(gebruiksrechten, related_data_folder)
         # Case 2: Not related to a zaak. Move the document to the destination folder
         else:
             document.move_object(day_folder)
+            if len(related_gebruiksrechten) > 0:
+                for gebruiksrechten in related_gebruiksrechten:
+                    gebruiksrechten.move_object(related_data_folder)
 
         # Create the Oio in a separate folder
         return self.create_content_object(
@@ -394,10 +410,6 @@ class SOAPCMISClient(SOAPCMISRequest):
         :param destination_folder: Folder, the folder in which to place the copied document
         :return: the copied document
         """
-
-        def get_property_type(cmis_name: str) -> str:
-            drc_name = reverse_mapper(cmis_name, type="document")
-            return get_cmis_type(EnkelvoudigInformatieObject, drc_name)
 
         # copy the properties from the source document
         drc_properties = {}
@@ -457,6 +469,103 @@ class SOAPCMISClient(SOAPCMISRequest):
         copy_document_id = extracted_data["properties"]["objectId"]["value"]
 
         return document.get_document(copy_document_id)
+
+    def copy_gebruiksrechten(
+        self, source_object: Gebruiksrechten, destination_folder: Folder
+    ) -> Gebruiksrechten:
+        """Copy a gebruiksrechten to a folder
+
+        :param source_object: Gebruiksrechten, the gebruiksrechten to copy
+        :param destination_folder: Folder, the folder in which to place the copied gebruiksrechten
+        :return: the copied object
+        """
+
+        # copy the properties from the source document
+        drc_properties = {}
+        for property_name, property_details in source_object.properties.items():
+            if (
+                "cmis:" not in property_name and property_details["value"] is not None
+            ) or property_name == "cmis:objectTypeId":
+                drc_properties[
+                    reverse_mapper(property_name, type="gebruiksrechten")
+                ] = property_details["value"]
+
+        cmis_properties = Gebruiksrechten.build_properties(drc_properties)
+
+        cmis_properties.update(
+            **{
+                "cmis:objectTypeId": {
+                    "value": source_object.objectTypeId,
+                    "type": "propertyId",
+                },
+                mapper("kopie_van", type="gebruiksrechten"): {
+                    "value": source_object.objectId,
+                    "type": "propertyString",  # Keep tack of where this is copied from.
+                },
+                "cmis:name": {"value": get_random_string(), "type": "propertyString"},
+            }
+        )
+
+        # Create copy gebruiksrechten
+        soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
+            repository_id=self.main_repo_id,
+            folder_id=destination_folder.objectId,
+            properties=cmis_properties,
+            cmis_action="createDocument",
+        )
+
+        soap_response = self.request(
+            "ObjectService", soap_envelope=soap_envelope.toxml(),
+        )
+
+        # Creating the document only returns its ID
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_object_properties_from_xml(
+            xml_response, "createDocument"
+        )[0]
+        copy_gebruiksrechten_id = extracted_data["properties"]["objectId"]["value"]
+
+        # Request all the properties of the newly created object
+        soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
+            repository_id=self.main_repo_id,
+            object_id=copy_gebruiksrechten_id,
+            cmis_action="getObject",
+        )
+
+        soap_response = self.request(
+            "ObjectService", soap_envelope=soap_envelope.toxml()
+        )
+
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_object_properties_from_xml(xml_response, "getObject")[
+            0
+        ]
+
+        return Gebruiksrechten(extracted_data)
+
+    def create_gebruiksrechten(self, data: dict) -> Gebruiksrechten:
+        """Create gebruiksrechten
+
+        The geburiksrechten is created in the 'Related data' folder in the folder
+        of the related document
+
+        :param data: dict, data of the gebruiksrechten
+        :return: Gebruiksrechten
+        """
+
+        document_uuid = data.get("informatieobject").split("/")[-1]
+        document = self.get_document(uuid=document_uuid)
+
+        parent_folder = document.get_parent_folders()[0]
+        related_data_folder = self.get_or_create_folder("Related data", parent_folder)
+
+        return self.create_content_object(
+            data=data,
+            object_type="gebruiksrechten",
+            destination_folder=related_data_folder,
+        )
 
     def create_content_object(
         self, data: dict, object_type: str, destination_folder: Folder = None

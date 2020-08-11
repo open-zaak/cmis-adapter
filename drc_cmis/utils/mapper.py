@@ -51,6 +51,7 @@ GEBRUIKSRECHTEN_MAP = {
     "omschrijving_voorwaarden": None,
     "startdatum": None,
     "einddatum": None,
+    "kopie_van": None,
 }
 
 OBJECTINFORMATIEOBJECT_MAP = {

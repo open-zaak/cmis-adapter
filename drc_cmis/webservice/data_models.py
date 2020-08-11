@@ -50,6 +50,7 @@ class Gebruiksrechten:
     omschrijving_voorwaarden: str
     informatieobject: str
     startdatum: datetime
+    kopie_van: str
 
 
 @dataclass
