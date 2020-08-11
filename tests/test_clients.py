@@ -431,7 +431,6 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
 
         # Creating the document in the temporary folder
-        identification = str(uuid.uuid4())
         properties = {
             "bronorganisatie": "159351741",
             "creatiedatum": timezone.now(),
@@ -447,7 +446,7 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         content = io.BytesIO(b"some file content")
 
         document = self.cmis_client.create_document(
-            identification=identification, data=properties, content=content,
+            identification="9124c668-db3f-4198-8823-4c21fed430d0", data=properties, content=content,
         )
 
         # Test that the document is in the temporary folder
@@ -770,6 +769,131 @@ class CMISClientOIOTests(DMSMixin, TestCase):
 
         self.assertTrue(copied_document_was_retrieved)
         self.assertEqual(copied_document.kopie_van, document.uuid)
+
+    def test_create_oio_with_zaak_key(self, m):
+        # Mocking the retrieval of the Zaak
+        m.get(self.zaak_url, json=self.zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktype
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification="9124c668-db3f-4198-8823-4c21fed430d0", data=properties, content=content,
+        )
+
+        # Creating the oio, passing the zaak url with 'zaak' key instead of 'object'
+        oio = {
+            "zaak": self.zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        oio = self.cmis_client.create_oio(oio)
+
+        self.assertEqual(oio.zaak, self.zaak_url)
+        self.assertEqual(oio.object_type, "zaak")
+        self.assertEqual(oio.informatieobject, f"https://testserver/api/v1/documenten/{document.uuid}")
+
+    def test_create_oio_with_besluit_key(self, m):
+        # Mocking the retrieval of the Zaak
+        m.get(self.zaak_url, json=self.zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the Besluit
+        m.get(self.besluit_url, json=self.besluit)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_besluit_url)
+
+        # Mocking the retrieval of the zaaktype
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification="9124c668-db3f-4198-8823-4c21fed430d0", data=properties, content=content,
+        )
+
+        # Creating the oio, passing the besluit url with 'besluit' key instead of 'object'
+        oio = {
+            "besluit": self.besluit_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "besluit",
+        }
+        oio = self.cmis_client.create_oio(oio)
+
+        self.assertEqual(oio.besluit, self.besluit_url)
+        self.assertEqual(oio.object_type, "besluit")
+        self.assertEqual(oio.informatieobject, f"https://testserver/api/v1/documenten/{document.uuid}")
+
+    def test_create_oio_with_object_key(self, m):
+        # Mocking the retrieval of the Zaak
+        m.get(self.zaak_url, json=self.zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktype
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification="9124c668-db3f-4198-8823-4c21fed430d0", data=properties, content=content,
+        )
+
+        # Creating the oio, passing the zaak url with 'zaak' key instead of 'object'
+        oio = {
+            "object": self.zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        oio = self.cmis_client.create_oio(oio)
+
+        self.assertEqual(oio.zaak, self.zaak_url)
+        self.assertEqual(oio.object_type, "zaak")
+        self.assertEqual(oio.informatieobject, f"https://testserver/api/v1/documenten/{document.uuid}")
+
 
 
 @freeze_time("2020-07-27 12:00:00")

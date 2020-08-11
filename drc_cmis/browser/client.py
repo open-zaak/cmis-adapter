@@ -252,13 +252,16 @@ class CMISDRCClient(CMISRequest):
         document_uuid = data.get("informatieobject").split("/")[-1]
         document = self.get_document(uuid=document_uuid)
 
+        if "object" in data:
+            data[data["object_type"]] = data.pop("object")
+
         # Retrieve the zaak and the zaaktype
         if data["object_type"] == "besluit":
-            client_besluit = get_zds_client(data["object"])
-            besluit_data = client_besluit.retrieve("besluit", url=data["object"])
+            client_besluit = get_zds_client(data["besluit"])
+            besluit_data = client_besluit.retrieve("besluit", url=data["besluit"])
             zaak_url = besluit_data["zaak"]
         else:
-            zaak_url = data["object"]
+            zaak_url = data["zaak"]
         client_zaak = get_zds_client(zaak_url)
         zaak_data = client_zaak.retrieve("zaak", url=zaak_url)
         client_zaaktype = get_zds_client(zaak_data["zaaktype"])
