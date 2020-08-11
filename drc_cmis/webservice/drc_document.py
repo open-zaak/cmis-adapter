@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 class CMISBaseObject(SOAPCMISRequest):
     name_map = None
+    type_name = None
+    type_class = None
 
     def __init__(self, data):
         super().__init__()
@@ -63,6 +65,37 @@ class CMISBaseObject(SOAPCMISRequest):
             raise AttributeError(f"No property '{convert_name}'")
 
         return self.properties[convert_name]["value"]
+
+    @classmethod
+    def build_properties(cls, data: dict) -> dict:
+        """Construct property dictionary.
+
+        The structure of the dictionary is (where ``property_name``, ``property_value``
+        and ``property_type`` are the name, value and type of the property):
+
+            .. code-block:: python
+
+                properties = {
+                    "property_name": {
+                        "value": property_value,
+                        "type": property_type,
+                    }
+                }
+        """
+
+        props = {}
+        for key, value in data.items():
+            prop_name = mapper(key, type=cls.type_name)
+            if not prop_name:
+                logger.debug("No property name found for key '%s'", key)
+                continue
+            if value is not None:
+                prop_type = get_cmis_type(cls.type_class, key)
+                if isinstance(value, datetime.date) or isinstance(value, datetime.date):
+                    value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                props[prop_name] = {"value": str(value), "type": prop_type}
+
+        return props
 
 
 class CMISContentObject(CMISBaseObject):
@@ -126,6 +159,7 @@ class CMISContentObject(CMISBaseObject):
 class Document(CMISContentObject):
     table = "drc:document"
     name_map = DOCUMENT_MAP
+    type_name = "document"
 
     @classmethod
     def build_properties(
@@ -364,37 +398,8 @@ class Document(CMISContentObject):
 class Gebruiksrechten(CMISContentObject):
     table = "drc:gebruiksrechten"
     name_map = GEBRUIKSRECHTEN_MAP
-
-    @classmethod
-    def build_properties(cls, data: dict) -> dict:
-        """Construct property dictionary.
-
-        The structure of the dictionary is (where ``property_name``, ``property_value``
-        and ``property_type`` are the name, value and type of the property):
-
-            .. code-block:: python
-
-                properties = {
-                    "property_name": {
-                        "value": property_value,
-                        "type": property_type,
-                    }
-                }
-        """
-
-        props = {}
-        for key, value in data.items():
-            prop_name = mapper(key, type="gebruiksrechten")
-            if not prop_name:
-                logger.debug("No property name found for key '%s'", key)
-                continue
-            if value is not None:
-                prop_type = get_cmis_type(GebruiksrechtenDoc, key)
-                if isinstance(value, datetime.date) or isinstance(value, datetime.date):
-                    value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                props[prop_name] = {"value": str(value), "type": prop_type}
-
-        return props
+    type_name = "gebruiksrechten"
+    type_class = GebruiksrechtenDoc
 
 
 class ObjectInformatieObject(CMISContentObject):
@@ -444,66 +449,12 @@ class Folder(CMISBaseObject):
 class ZaakTypeFolder(CMISBaseObject):
     table = "drc:zaaktypefolder"
     name_map = ZAAKTYPE_MAP
-
-    @classmethod
-    def build_properties(cls, data: dict) -> dict:
-        """Construct property dictionary.
-
-        The structure of the dictionary is (where ``property_name``, ``property_value``
-        and ``property_type`` are the name, value and type of the property):
-
-            .. code-block:: python
-
-                properties = {
-                    "property_name": {
-                        "value": property_value,
-                        "type": property_type,
-                    }
-                }
-        """
-
-        props = {}
-        for key, value in data.items():
-            prop_name = mapper(key, type="zaaktype")
-            if not prop_name:
-                logger.debug("No property name found for key '%s'", key)
-                continue
-            if value is not None:
-                prop_type = get_cmis_type(ZaakTypeFolderData, key)
-                props[prop_name] = {"value": str(value), "type": prop_type}
-
-        return props
+    type_name = "zaaktype"
+    type_class = ZaakTypeFolderData
 
 
 class ZaakFolder(CMISBaseObject):
     table = "drc:zaakfolder"
     name_map = ZAAK_MAP
-
-    @classmethod
-    def build_properties(cls, data: dict) -> dict:
-        """Construct property dictionary.
-
-        The structure of the dictionary is (where ``property_name``, ``property_value``
-        and ``property_type`` are the name, value and type of the property):
-
-            .. code-block:: python
-
-                properties = {
-                    "property_name": {
-                        "value": property_value,
-                        "type": property_type,
-                    }
-                }
-        """
-
-        props = {}
-        for key, value in data.items():
-            prop_name = mapper(key, type="zaak")
-            if not prop_name:
-                logger.debug("No property name found for key '%s'", key)
-                continue
-            if value is not None:
-                prop_type = get_cmis_type(ZaakFolderData, key)
-                props[prop_name] = {"value": str(value), "type": prop_type}
-
-        return props
+    type_name = "zaak"
+    type_class = ZaakFolderData

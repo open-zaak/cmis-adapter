@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 class CMISBaseObject(CMISRequest):
     name_map = None
+    type_name = None
+    type_class = None
 
     def __init__(self, data):
         super().__init__()
@@ -63,6 +65,23 @@ class CMISBaseObject(CMISRequest):
             raise AttributeError(f"No property '{convert_name}'")
 
         return self.properties[convert_name]["value"]
+
+    @classmethod
+    def build_properties(cls, data: dict) -> dict:
+        """Construct property dictionary."""
+
+        props = {}
+        for key, value in data.items():
+            prop_name = mapper(key, type=cls.type_name)
+            if not prop_name:
+                logger.debug("No property name found for key '%s'", key)
+                continue
+            if value is not None:
+                if isinstance(value, datetime.date) or isinstance(value, datetime.date):
+                    value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                props[prop_name] = str(value)
+
+        return props
 
 
 class CMISContentObject(CMISBaseObject):
@@ -270,6 +289,7 @@ class Document(CMISContentObject):
 class Gebruiksrechten(CMISContentObject):
     table = "drc:gebruiksrechten"
     name_map = GEBRUIKSRECHTEN_MAP
+    type_name = "gebruiksrechten"
 
 
 class ObjectInformatieObject(CMISContentObject):
@@ -297,8 +317,10 @@ class Folder(CMISBaseObject):
 class ZaakTypeFolder(CMISBaseObject):
     table = "drc:zaaktypefolder"
     name_map = ZAAKTYPE_MAP
+    type_name = "zaaktype"
 
 
 class ZaakFolder(CMISBaseObject):
     table = "drc:zaakfolder"
     name_map = ZAAK_MAP
+    type_name = "zaak"

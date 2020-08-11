@@ -15,7 +15,8 @@ class Migration(migrations.Migration):
             name="base_folder_name",
             field=models.CharField(
                 default="",
-                help_text="Name of the DMS base folder in which the documents will be stored. If left empty, no base folder will be used.",
+                help_text="Name of the DMS base folder in which the documents will be stored. "
+                          "If left empty, no base folder will be used.",
                 max_length=200,
             ),
         ),
