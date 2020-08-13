@@ -1,5 +1,6 @@
 from django.db import models
 
+import pytz
 from djchoices import ChoiceItem, DjangoChoices
 from solo.models import SingletonModel
 
@@ -20,6 +21,7 @@ class CMISConfig(SingletonModel):
     )
     time_zone = models.CharField(
         default="UTC",
+        choices=[(k, k) for k in pytz.common_timezones],
         max_length=200,
         help_text="The time zone of the DMS. Only needed when using Browser binding.",
     )
@@ -32,6 +34,7 @@ class CMISConfig(SingletonModel):
     base_folder_name = models.CharField(
         max_length=200,
         default="",
+        blank=True,
         help_text="Name of the DMS base folder in which the documents will be stored. If left empty, no "
         "base folder will be used.",
     )
