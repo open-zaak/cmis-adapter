@@ -29,8 +29,7 @@ class DMSMixin:
     def setUp(self):
         super().setUp()
         self.cmis_client = get_cmis_client()
-        self._removeTree()
-        self.cmis_client._base_folder = None
+        self.cmis_client.delete_cmis_folders_in_base()
 
-    def _removeTree(self):
+    def tearDown(self) -> None:
         self.cmis_client.delete_cmis_folders_in_base()

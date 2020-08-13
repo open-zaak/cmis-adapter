@@ -95,17 +95,17 @@ class CMISClient:
         """Deletes all the folders in the base folder
 
         There are 2 cases:
-        1. The base folder is the root folder: all the folders in the
-        root folder are deleted (but not the root folder itself)
+        1. The base folder is the root folder: only the zaaktype and temporary folders should be deleted
         2. The base folder is a child of the root folder: the base folder is deleted.
         """
         # Case 2
         if self.base_folder_name != "":
             self.base_folder.delete_tree()
+            self._base_folder = None
         # Case 1
         else:
-            for folder in self.base_folder.get_children_folders():
-                folder.delete_tree()
+            # TODO
+            pass
 
     def create_oio(self, data: dict) -> ObjectInformatieObject:
         """Create ObjectInformatieObject which relates a document with a zaak or besluit
