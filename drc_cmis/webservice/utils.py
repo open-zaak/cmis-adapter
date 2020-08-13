@@ -1,9 +1,12 @@
 import logging
 import re
-from datetime import datetime, timedelta
+import uuid
+from datetime import timedelta
 from io import BytesIO
 from typing import List, Optional, Tuple
 from xml.dom import minidom
+
+from django.utils import timezone
 
 from cmislib.util import parsePropValue
 
@@ -198,46 +201,60 @@ def make_soap_envelope(
 
     # Creates the security header
     header_element = xml_doc.createElement("soapenv:Header")
-    security_header = xml_doc.createElement("Security")
+    security_header = xml_doc.createElement("wsse:Security")
     security_header.setAttribute(
-        "xmlns",
+        "xmlns:wsse",
         "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd",
     )
+    security_header.setAttribute(
+        "xmlns:wsu",
+        "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd",
+    )
+    security_header_id = uuid.uuid4().hex
+
+    # Username token
+    username_token = xml_doc.createElement("wsse:UsernameToken")
+    username_token.setAttribute(
+        "wsu:Id", f"UsernameToken-{security_header_id}",
+    )
+    username_tag = xml_doc.createElement("wsse:Username")
+    username_text = xml_doc.createTextNode(auth[0])
+    username_tag.appendChild(username_text)
+    username_token.appendChild(username_tag)
+
+    password_tag = xml_doc.createElement("wsse:Password")
+    password_tag.setAttribute(
+        "Type",
+        "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText",
+    )
+    password_text = xml_doc.createTextNode(auth[1])
+    password_tag.appendChild(password_text)
+    username_token.appendChild(password_tag)
+
+    security_header.appendChild(username_token)
+
+    header_element.appendChild(security_header)
+    entry_element.appendChild(header_element)
 
     # Time stamp
-    time_stamp_tag = xml_doc.createElement("Timestamp")
+    time_stamp_tag = xml_doc.createElement("wsu:Timestamp")
+    time_stamp_tag.setAttribute(
+        "wsu:Id", f"TS-{security_header_id}",
+    )
 
-    created_tag = xml_doc.createElement("Created")
-    created_text = xml_doc.createTextNode(datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"))
+    created_tag = xml_doc.createElement("wsu:Created")
+    created_text = xml_doc.createTextNode(timezone.now().strftime("%Y-%m-%dT%H:%M:%SZ"))
     created_tag.appendChild(created_text)
     time_stamp_tag.appendChild(created_tag)
 
-    expires_tag = xml_doc.createElement("Expires")
+    expires_tag = xml_doc.createElement("wsu:Expires")
     expires_text = xml_doc.createTextNode(
-        (datetime.now() + timedelta(1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        (timezone.now() + timedelta(1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     )
     expires_tag.appendChild(expires_text)
     time_stamp_tag.appendChild(expires_tag)
 
     security_header.appendChild(time_stamp_tag)
-
-    # Username token
-    username_token_tag = xml_doc.createElement("UsernameToken")
-
-    username_tag = xml_doc.createElement("Username")
-    username_text = xml_doc.createTextNode(auth[0])
-    username_tag.appendChild(username_text)
-    username_token_tag.appendChild(username_tag)
-
-    password_tag = xml_doc.createElement("Password")
-    password_text = xml_doc.createTextNode(auth[1])
-    password_tag.appendChild(password_text)
-    username_token_tag.appendChild(password_tag)
-
-    security_header.appendChild(username_token_tag)
-
-    header_element.appendChild(security_header)
-    entry_element.appendChild(header_element)
 
     # Body of the document
     body_element = xml_doc.createElement("soapenv:Body")
