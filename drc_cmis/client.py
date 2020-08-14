@@ -3,6 +3,8 @@ from uuid import UUID
 
 from django.utils import timezone
 
+from drc_cmis.utils.exceptions import DocumentDoesNotExistError
+
 from .models import Vendor
 
 # The Document/Folder/Oio/Gebruiksrechten classes used in practice depend on the client
@@ -127,7 +129,7 @@ class CMISClient:
 
         # Get the document
         document_uuid = data.get("informatieobject").split("/")[-1]
-        document = self.get_document(uuid=document_uuid)
+        document = self.get_document(drc_uuid=document_uuid)
 
         if "object" in data:
             data[data["object_type"]] = data.pop("object")
@@ -197,7 +199,7 @@ class CMISClient:
         """
 
         document_uuid = data.get("informatieobject").split("/")[-1]
-        document = self.get_document(uuid=document_uuid)
+        document = self.get_document(drc_uuid=document_uuid)
 
         parent_folder = document.get_parent_folders()[0]
         related_data_folder = self.get_or_create_folder("Related data", parent_folder)
@@ -262,3 +264,24 @@ class CMISClient:
         return self.get_or_create_folder(
             f"zaak-{zaak['identificatie']}", zaaktype_folder, properties
         )
+
+    def get_latest_version_not_pwc(self, extracted_data: List) -> Document:
+        """Return the latest version which is not the pwc
+
+        :param extracted_data: dict, the results of a query
+        "SELECT * FROM drc:document WHERE drc:document__uuid = '<uuid>'"
+        :return: Document, the latest not locked version of a document
+        """
+        error_string = "Document bestaat niet in het CMIS connection"
+        does_not_exist = DocumentDoesNotExistError(error_string)
+
+        if len(extracted_data) == 0:
+            raise does_not_exist
+        elif len(extracted_data) == 1:
+            return self.document_type(extracted_data[0])
+        elif len(extracted_data) == 2:
+            # In this case there is both the latest version and pwc
+            # return the latest version
+            for doc_data in extracted_data:
+                if doc_data["properties"]["cmis:versionLabel"]["value"] != "pwc":
+                    return self.document_type(doc_data)

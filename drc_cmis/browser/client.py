@@ -1,5 +1,6 @@
 import datetime
 import logging
+import uuid
 from io import BytesIO
 from typing import List, Optional, Union
 from uuid import UUID
@@ -10,6 +11,7 @@ from django.utils.crypto import constant_time_compare
 from cmislib.exceptions import UpdateConflictException
 
 from drc_cmis.browser.drc_document import (
+    CMISContentObject,
     Document,
     Folder,
     Gebruiksrechten,
@@ -157,6 +159,7 @@ class CMISDRCClient(CMISClient, CMISRequest):
                 mapper(
                     "kopie_van", type="gebruiksrechten"
                 ): source_object.objectId,  # Keep tack of where this is copied from.
+                mapper("uuid", type="gebruiksrechten"): str(uuid.uuid4()),
             }
         )
 
@@ -186,6 +189,7 @@ class CMISDRCClient(CMISClient, CMISRequest):
                 "cmis:objectTypeId": document.objectTypeId,
                 mapper("titel", type="document"): f"{document.titel} - copy",
                 "drc:kopie_van": document.uuid,  # Keep tack of where this is copied from.
+                "drc:document__uuid": str(uuid.uuid4()),
             }
         )
 
@@ -204,7 +208,7 @@ class CMISDRCClient(CMISClient, CMISRequest):
 
     def create_content_object(
         self, data: dict, object_type: str, destination_folder: Folder = None
-    ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
+    ) -> CMISContentObject:
         """Create a Gebruiksrechten or a ObjectInformatieObject
 
         :param data: dict, properties of the object to create
@@ -236,17 +240,19 @@ class CMISDRCClient(CMISClient, CMISRequest):
             "cmisaction": "createDocument",
             "propertyId[0]": "cmis:name",
             "propertyValue[0]": get_random_string(),
+            "propertyId[1]": f"drc:{object_type}__uuid",
+            "propertyValue[1]": str(uuid.uuid4()),
         }
 
-        json_data["propertyId[1]"] = "cmis:objectTypeId"
+        json_data["propertyId[2]"] = "cmis:objectTypeId"
         if "cmis:objectTypeId" in properties.keys():
-            json_data["propertyValue[1]"] = properties.pop("cmis:objectTypeId")
+            json_data["propertyValue[2]"] = properties.pop("cmis:objectTypeId")
         else:
             json_data[
-                "propertyValue[1]"
+                "propertyValue[2]"
             ] = f"{self.get_object_type_id_prefix(object_type)}drc:{object_type}"
 
-        prop_count = 2
+        prop_count = 3
         for prop_key, prop_value in properties.items():
             if isinstance(prop_value, datetime.date):
                 prop_value = prop_value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
@@ -263,12 +269,11 @@ class CMISDRCClient(CMISClient, CMISRequest):
             return ObjectInformatieObject(json_response)
 
     def get_content_object(
-        self, uuid: Union[str, UUID], object_type: str
-    ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
+        self, drc_uuid: Union[str, UUID], object_type: str
+    ) -> CMISContentObject:
         """Get the gebruiksrechten/oio with specified uuid
 
-        :param uuid: string or UUID, identifier that when combined with 'workspace://SpacesStore/' and the version
-        number gives the cmis:objectId
+        :param drc_uuid: string or UUID, the value of drc:oio__uuid or drc:gebruiksrechten__uuid
         :param object_type: string, either "gebruiksrechten" or "oio"
         :return: Either a Gebruiksrechten or ObjectInformatieObject
         """
@@ -278,11 +283,12 @@ class CMISDRCClient(CMISClient, CMISRequest):
             "oio",
         ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
 
-        query = CMISQuery(
-            "SELECT * FROM drc:%s WHERE cmis:objectId = 'workspace://SpacesStore/%s;1.0'"
-        )
+        query = CMISQuery("SELECT * FROM drc:%s WHERE drc:%s__uuid = '%s'")
 
-        data = {"cmisaction": "query", "statement": query(object_type, str(uuid))}
+        data = {
+            "cmisaction": "query",
+            "statement": query(object_type, object_type, str(drc_uuid)),
+        }
 
         json_response = self.post_request(self.base_url, data)
 
@@ -336,12 +342,12 @@ class CMISDRCClient(CMISClient, CMISRequest):
         content.seek(0)
         return cmis_doc.set_content_stream(content)
 
-    def lock_document(self, uuid: str, lock: str):
+    def lock_document(self, drc_uuid: str, lock: str):
         """
         Check out the CMIS document and store the lock value for check in/unlock.
         """
         logger.debug("CMIS checkout of document %s (lock value %s)", uuid, lock)
-        cmis_doc = self.get_document(uuid)
+        cmis_doc = self.get_document(drc_uuid)
 
         already_locked = DocumentLockedException(
             "Document was already checked out", code="double_lock"
@@ -364,10 +370,12 @@ class CMISDRCClient(CMISClient, CMISRequest):
             "CMIS checkout of document %s with lock value %s succeeded", uuid, lock
         )
 
-    def unlock_document(self, uuid: str, lock: str, force: bool = False) -> Document:
+    def unlock_document(
+        self, drc_uuid: str, lock: str, force: bool = False
+    ) -> Document:
         """Unlock a document with objectId workspace://SpacesStore/<uuid>"""
-        logger.debug(f"CMIS_BACKEND: unlock_document {uuid} start with: {lock}")
-        cmis_doc = self.get_document(uuid)
+        logger.debug(f"CMIS_BACKEND: unlock_document {drc_uuid} start with: {lock}")
+        cmis_doc = self.get_document(drc_uuid)
         pwc = cmis_doc.get_private_working_copy()
 
         if constant_time_compare(pwc.lock, lock) or force:
@@ -379,10 +387,10 @@ class CMISDRCClient(CMISClient, CMISRequest):
         raise LockDidNotMatchException("Lock did not match", code="unlock-failed")
 
     def update_document(
-        self, uuid: str, lock: str, data: dict, content=None
+        self, drc_uuid: str, lock: str, data: dict, content=None
     ) -> Document:
-        logger.debug("Updating document with UUID %s", uuid)
-        cmis_doc = self.get_document(uuid)
+        logger.debug("Updating document with UUID %s", drc_uuid)
+        cmis_doc = self.get_document(drc_uuid)
 
         if not cmis_doc.isVersionSeriesCheckedOut:
             raise DocumentNotLockedException(
@@ -422,11 +430,13 @@ class CMISDRCClient(CMISClient, CMISRequest):
 
         return pwc
 
-    def get_document(self, uuid: Optional[str], via_identification=None, filters=None):
+    def get_document(
+        self, drc_uuid: Optional[str], via_identification=None, filters=None
+    ):
         """
         Given a cmis document instance.
 
-        :param uuid: UUID of the document as used in the endpoint URL
+        :param drc_uuid: str, the drc:document__uuid
         :return: :class:`AtomPubDocument` object, the latest version of this document
         """
         logger.debug("CMIS_CLIENT: get_cmis_document")
@@ -434,31 +444,28 @@ class CMISDRCClient(CMISClient, CMISRequest):
             not via_identification
         ), "Support for 'via_identification' is being dropped"
 
-        error_string = (
-            f"Document met identificatie {uuid} bestaat niet in het CMIS connection"
-        )
+        error_string = f"Document met drc:document__uuid {drc_uuid} bestaat niet in het CMIS connection"
         does_not_exist = DocumentDoesNotExistError(error_string)
 
         # shortcut - no reason in going over the wire
         if uuid is None:
             raise does_not_exist
 
-        # this always selects the latest version
-        query = CMISQuery("SELECT * FROM drc:document WHERE cmis:objectId = '%s' %s")
+        # this always selects the latest version, and if there is a pwc, also the pwc is returned
+        query = CMISQuery(
+            "SELECT * FROM drc:document WHERE drc:document__uuid = '%s' %s"
+        )
 
         filter_string = build_query_filters(
             filters, filter_string="AND ", strip_end=True
         )
         data = {
             "cmisaction": "query",
-            "statement": query(uuid, filter_string),
+            "statement": query(drc_uuid, filter_string),
         }
         json_response = self.post_request(self.base_url, data)
 
-        try:
-            return self.get_first_result(json_response, Document)
-        except GetFirstException as exc:
-            raise does_not_exist from exc
+        return self.get_latest_version_not_pwc(json_response.get("results"))
 
     def check_document_exists(self, identification: Union[str, UUID]):
         """Query by identification (``identificatie``) if a document is in the repository"""

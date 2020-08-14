@@ -32,6 +32,7 @@ from drc_cmis.webservice.data_models import (
     get_cmis_type,
 )
 from drc_cmis.webservice.drc_document import (
+    CMISContentObject,
     Document,
     Folder,
     Gebruiksrechten,
@@ -257,6 +258,10 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
                     "value": document.uuid,
                     "type": "propertyString",
                 },  # Keep tack of where this is copied from.
+                "drc:document__uuid": {
+                    "value": str(uuid.uuid4()),
+                    "type": "propertyString",
+                },
             }
         )
 
@@ -323,6 +328,10 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
                     "type": "propertyString",  # Keep tack of where this is copied from.
                 },
                 "cmis:name": {"value": get_random_string(), "type": "propertyString"},
+                "drc:gebruiksrechten__uuid": {
+                    "value": str(uuid.uuid4()),
+                    "type": "propertyString",
+                },
             }
         )
 
@@ -367,7 +376,7 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
 
     def create_content_object(
         self, data: dict, object_type: str, destination_folder: Folder = None
-    ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
+    ) -> CMISContentObject:
         """Create a Gebruiksrechten or a ObjectInformatieObject
 
         :param data: dict, properties of the object to create
@@ -394,17 +403,7 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
             day_folder = self.get_or_create_folder(str(now.day), month_folder)
             destination_folder = self.get_or_create_folder("Related data", day_folder)
 
-        properties = {}
-        for key, value in data.items():
-            if mapper(key, type=object_type):
-                prop_type = get_cmis_type(data_class, key)
-                prop_name = mapper(key, type=object_type)
-                if prop_type == "propertyDateTime":
-                    if isinstance(value, datetime.datetime) or isinstance(
-                        value, datetime.date
-                    ):
-                        value = value.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                properties[prop_name] = {"value": value, "type": prop_type}
+        properties = return_type.build_properties(data)
 
         properties.setdefault(
             "cmis:objectTypeId",
@@ -415,6 +414,10 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
         )
         properties.setdefault(
             "cmis:name", {"value": get_random_string(), "type": "propertyString"}
+        )
+        properties.setdefault(
+            mapper("uuid", type=object_type),
+            {"value": str(uuid.uuid4()), "type": get_cmis_type(data_class, "uuid")},
         )
 
         soap_envelope = make_soap_envelope(
@@ -455,12 +458,11 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
         return return_type(extracted_data)
 
     def get_content_object(
-        self, uuid: Union[str, UUID], object_type: str
-    ) -> Union[Gebruiksrechten, ObjectInformatieObject]:
+        self, drc_uuid: Union[str, UUID], object_type: str
+    ) -> CMISContentObject:
         """Get the gebruiksrechten/oio with specified uuid
 
-        :param uuid: string or UUID, identifier that when combined with 'workspace://SpacesStore/' and the version
-        number gives the cmis:objectId
+        :param drc_uuid: string or UUID, the value of drc:oio__uuid or drc:gebruiksrechten__uuid
         :param object_type: string, either "gebruiksrechten" or "oio"
         :return: Either a Gebruiksrechten or ObjectInformatieObject
         """
@@ -470,14 +472,12 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
             "oio",
         ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
 
-        query = CMISQuery(
-            "SELECT * FROM drc:%s WHERE cmis:objectId = 'workspace://SpacesStore/%s;1.0'"
-        )
+        query = CMISQuery("SELECT * FROM drc:%s WHERE drc:%s__uuid = '%s'")
 
         soap_envelope = make_soap_envelope(
             auth=(self.user, self.password),
             repository_id=self.main_repo_id,
-            statement=query(object_type, str(uuid)),
+            statement=query(object_type, object_type, str(drc_uuid)),
             cmis_action="query",
         )
 
@@ -485,21 +485,22 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
             "DiscoveryService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
-        num_items = extract_num_items(xml_response)
 
         object_title = object_type.capitalize()
-        error_string = f"{object_title} document met identificatie {uuid} bestaat niet in het CMIS connection"
+        error_string = (
+            f"{object_title} {object_type} met identificatie drc:{object_type}__uuid {drc_uuid} "
+            f"bestaat niet in het CMIS connection"
+        )
         does_not_exist = DocumentDoesNotExistError(error_string)
 
-        if num_items == 0:
+        extracted_data = extract_object_properties_from_xml(xml_response, "query")
+        if len(extracted_data) == 0:
             raise does_not_exist
 
-        extracted_data = extract_object_properties_from_xml(xml_response, "query")[0]
-
         if object_type == "oio":
-            return ObjectInformatieObject(extracted_data)
+            return ObjectInformatieObject(extracted_data[0])
         elif object_type == "gebruiksrechten":
-            return Gebruiksrechten(extracted_data)
+            return Gebruiksrechten(extracted_data[0])
 
     def create_document(
         self, identification: str, data: dict, content: BytesIO = None
@@ -575,13 +576,13 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
 
         return Document(extracted_data)
 
-    def lock_document(self, uuid: str, lock: str):
-        """Lock a EnkelvoudigInformatieObject with objectId workspace://SpacesStore/<uuid>
+    def lock_document(self, drc_uuid: str, lock: str):
+        """Lock a EnkelvoudigInformatieObject with given drc:document__uuid
 
-        :param uuid: string, uuid used to create the objectId
+        :param drc_uuid: string, the value of drc:document__uuid
         :param lock: string, value of the lock
         """
-        cmis_doc = self.get_document(uuid)
+        cmis_doc = self.get_document(drc_uuid)
 
         already_locked = DocumentLockedException(
             "Document was already checked out", code="double_lock"
@@ -606,15 +607,17 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
         except CmisUpdateConflictException as exc:
             raise already_locked from exc
 
-    def unlock_document(self, uuid: str, lock: str, force: bool = False) -> Document:
-        """Unlock a document with objectId workspace://SpacesStore/<uuid>
+    def unlock_document(
+        self, drc_uuid: str, lock: str, force: bool = False
+    ) -> Document:
+        """Unlock a document with given uuid
 
-        :param uuid: string, uuid used to create the objectId
+        :param drc_uuid: string, the value of drc:document__uuid
         :param lock: string, value of the lock
         :param force: bool, whether to force the unlocking
         :return: Document, the unlocked document
         """
-        cmis_doc = self.get_document(uuid)
+        cmis_doc = self.get_document(drc_uuid)
         pwc = cmis_doc.get_private_working_copy()
 
         if constant_time_compare(pwc.lock, lock) or force:
@@ -630,17 +633,17 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
         raise LockDidNotMatchException("Lock did not match", code="unlock-failed")
 
     def update_document(
-        self, uuid: str, lock: str, data: dict, content: Optional[BytesIO] = None
+        self, drc_uuid: str, lock: str, data: dict, content: Optional[BytesIO] = None
     ) -> Document:
         """Update a Document (with the EnkelvoudigInformatieObject properties)
 
-        :param uuid: string, the uuid that combined with workspace://SpacesStore/<uuid> gives the objectId
+        :param drc_uuid: string, the value of drc:document__uuid
         :param lock: string, value of the lock
         :param data: dict, the new properties of the document
         :param content: BytesIO, the new content of the document
         :return: Document, the updated document
         """
-        cmis_doc = self.get_document(uuid)
+        cmis_doc = self.get_document(drc_uuid)
 
         if not cmis_doc.isVersionSeriesCheckedOut:
             raise DocumentNotLockedException(
@@ -679,22 +682,23 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
 
         return pwc
 
-    def get_document(self, uuid: str, filters: Optional[dict] = None) -> Document:
-        """Retrieve a document in the main repository with objectId workspace://SpacesStore/<uuid>
+    # FIXME filters are useless because uuid is unique
+    def get_document(self, drc_uuid: str, filters: Optional[dict] = None) -> Document:
+        """Retrieve a document in the main repository with given uuid (drc:document__uuid)
 
-        :param uuid: string, uuid used to create the objectId
+        :param drc_uuid: string, value of the cmis property drc:document__uuid
         :param filters: dict, filters to find the document
         :return: Document, the first document found
         """
-        error_string = f"Document met objectId workspace://SpacesStore/{uuid} bestaat niet in het CMIS connection"
+        error_string = f"Document met drc:document__uuid {drc_uuid} bestaat niet in het CMIS connection"
         does_not_exist = DocumentDoesNotExistError(error_string)
 
-        if uuid is None:
+        if drc_uuid is None:
             raise does_not_exist
 
-        # This selects the latest version of a document
+        # This always selects the latest version, and if there is a pwc, also the pwc is returned
         query = CMISQuery(
-            "SELECT * FROM drc:document WHERE cmis:objectId = 'workspace://SpacesStore/%s' %s"
+            "SELECT * FROM drc:document WHERE drc:document__uuid = '%s' %s"
         )
 
         filter_string = build_query_filters(
@@ -704,7 +708,7 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
         soap_envelope = make_soap_envelope(
             auth=(self.user, self.password),
             repository_id=self.main_repo_id,
-            statement=query(uuid, filter_string),
+            statement=query(drc_uuid, filter_string),
             cmis_action="query",
         )
 
@@ -712,12 +716,8 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
             "DiscoveryService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
-        num_items = extract_num_items(xml_response)
-        if num_items == 0:
-            raise does_not_exist
-
-        extracted_data = extract_object_properties_from_xml(xml_response, "query")[0]
-        return Document(extracted_data)
+        extracted_data = extract_object_properties_from_xml(xml_response, "query")
+        return self.get_latest_version_not_pwc(extracted_data)
 
     def check_document_exists(self, identification: Union[str, UUID]):
         """Query by identification if a document is in the repository
@@ -739,9 +739,8 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
             "DiscoveryService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_object_properties_from_xml(xml_response, "query")
 
-        num_items = extract_num_items(xml_response)
-
-        if num_items > 0:
+        if len(extracted_data) > 0:
             error_string = f"Document identificatie {identification} is niet uniek."
             raise DocumentExistsError(error_string)

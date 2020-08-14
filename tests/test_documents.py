@@ -46,6 +46,8 @@ class CMISDocumentTests(DMSMixin, TestCase):
         built_properties = document.build_properties(data=properties)
 
         self.assertIn("cmis:objectTypeId", built_properties)
+        self.assertIn("drc:document__uuid", built_properties)
+        self.assertIsNotNone(built_properties["drc:document__uuid"])
 
         for prop_name, prop_dict in built_properties.items():
             self.assertIn("type", prop_dict)
@@ -78,6 +80,8 @@ class CMISDocumentTests(DMSMixin, TestCase):
         built_properties = document.build_properties(data=properties)
 
         self.assertIn("cmis:objectTypeId", built_properties)
+        self.assertIn("drc:document__uuid", built_properties)
+        self.assertIsNotNone(built_properties["drc:document__uuid"])
 
         for prop_name, prop_value in built_properties.items():
 
@@ -433,8 +437,8 @@ class CMISContentObjectsTests(DMSMixin, TestCase):
         oio = self.cmis_client.create_content_object(data={}, object_type="oio")
 
         # Doesn't raise an exception, because the documents exist
-        self.cmis_client.get_content_object(gebruiksrechten.objectId, "gebruiksrechten")
-        self.cmis_client.get_content_object(oio.objectId, "oio")
+        self.cmis_client.get_content_object(gebruiksrechten.uuid, "gebruiksrechten")
+        self.cmis_client.get_content_object(oio.uuid, "oio")
 
         gebruiksrechten.delete_object()
         oio.delete_object()
@@ -471,6 +475,126 @@ class CMISContentObjectsTests(DMSMixin, TestCase):
         parent_folder = moved_oio.get_parent_folders()[0]
 
         self.assertEqual(parent_folder.name, "Folder")
+
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "WEBSERVICE",
+        "Properties are built differently between bindings",
+    )
+    def test_create_properties_gebruiksrechten_webservice(self):
+        from drc_cmis.webservice.drc_document import Gebruiksrechten
+
+        current_datetime = timezone.now()
+
+        data = {
+            "informatieobject": "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
+            "startdatum": current_datetime,
+            "omschrijving_voorwaarden": "Een hele set onredelijke voorwaarden",
+        }
+
+        properties = Gebruiksrechten.build_properties(data)
+        self.assertEqual(
+            properties["drc:gebruiksrechten__informatieobject"]["value"],
+            "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
+        )
+        self.assertEqual(
+            properties["drc:gebruiksrechten__startdatum"]["value"],
+            current_datetime.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        )
+        self.assertEqual(
+            properties["drc:gebruiksrechten__omschrijving_voorwaarden"]["value"],
+            "Een hele set onredelijke voorwaarden",
+        )
+        self.assertNotIn(
+            "drc:gebruiksrechten__uuid", properties,
+        )
+
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "WEBSERVICE",
+        "Properties are built differently between bindings",
+    )
+    def test_create_properties_oio_webservice(self):
+        from drc_cmis.webservice.drc_document import ObjectInformatieObject
+
+        data = {
+            "informatieobject": "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
+            "object_type": "besluit",
+            "besluit": "http://another.test.url/",
+        }
+
+        properties = ObjectInformatieObject.build_properties(data)
+        self.assertEqual(
+            properties["drc:oio__informatieobject"]["value"],
+            "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
+        )
+        self.assertEqual(
+            properties["drc:oio__object_type"]["value"], "besluit",
+        )
+        self.assertEqual(
+            properties["drc:oio__besluit"]["value"], "http://another.test.url/",
+        )
+        self.assertNotIn(
+            "drc:oio__uuid", properties,
+        )
+
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "BROWSER",
+        "Properties are built differently between bindings",
+    )
+    def test_create_properties_gebruiksrechten_browser(self):
+        from drc_cmis.browser.drc_document import Gebruiksrechten
+
+        current_datetime = timezone.now()
+
+        data = {
+            "informatieobject": "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
+            "startdatum": current_datetime,
+            "omschrijving_voorwaarden": "Een hele set onredelijke voorwaarden",
+        }
+
+        properties = Gebruiksrechten.build_properties(data)
+        self.assertEqual(
+            properties["drc:gebruiksrechten__informatieobject"],
+            "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
+        )
+        self.assertEqual(
+            properties["drc:gebruiksrechten__startdatum"],
+            current_datetime.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        )
+        self.assertEqual(
+            properties["drc:gebruiksrechten__omschrijving_voorwaarden"],
+            "Een hele set onredelijke voorwaarden",
+        )
+        self.assertNotIn(
+            "drc:gebruiksrechten__uuid", properties,
+        )
+
+    @skipIf(
+        os.getenv("CMIS_BINDING") != "BROWSER",
+        "Properties are built differently between bindings",
+    )
+    def test_create_properties_oio_browser(self):
+        from drc_cmis.browser.drc_document import ObjectInformatieObject
+
+        data = {
+            "informatieobject": "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
+            "object_type": "besluit",
+            "besluit": "http://another.test.url/",
+        }
+
+        properties = ObjectInformatieObject.build_properties(data)
+        self.assertEqual(
+            properties["drc:oio__informatieobject"],
+            "http://some.test.url/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
+        )
+        self.assertEqual(
+            properties["drc:oio__object_type"], "besluit",
+        )
+        self.assertEqual(
+            properties["drc:oio__besluit"], "http://another.test.url/",
+        )
+        self.assertNotIn(
+            "drc:oio__uuid", properties,
+        )
 
 
 class CMISFolderTests(DMSMixin, TestCase):

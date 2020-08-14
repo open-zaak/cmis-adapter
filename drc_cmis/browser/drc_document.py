@@ -1,6 +1,7 @@
 import datetime
 import logging
 import mimetypes
+import uuid
 from datetime import date
 from io import BytesIO
 from typing import List, Optional, Union
@@ -147,6 +148,9 @@ class Document(CMISContentObject):
                 continue
             props[prop_name] = value
 
+        # For documents that are not new, the uuid shouldn't be written
+        props.pop(mapper("uuid"), None)
+
         if new:
             # increase likelihood of uniqueness of title by appending a random string
             title, suffix = data.get("titel"), get_random_string()
@@ -159,8 +163,8 @@ class Document(CMISContentObject):
                 prop_name = mapper("identificatie")
                 props[prop_name] = identification
 
-        # can't or shouldn't be written
-        props.pop(mapper("uuid"), None)
+            # For new documents, the uuid needs to be set
+            props[mapper("uuid", type="document")] = str(uuid.uuid4())
 
         return props
 
@@ -295,6 +299,7 @@ class Gebruiksrechten(CMISContentObject):
 class ObjectInformatieObject(CMISContentObject):
     table = "drc:oio"
     name_map = OBJECTINFORMATIEOBJECT_MAP
+    type_name = "oio"
 
 
 class Folder(CMISBaseObject):

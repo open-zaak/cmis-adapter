@@ -285,6 +285,8 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
             data=properties, object_type="gebruiksrechten"
         )
 
+        self.assertIsNotNone(gebruiksrechten.uuid)
+
         self.assertEqual(
             gebruiksrechten.informatieobject, properties["informatieobject"]
         )
@@ -305,6 +307,7 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
 
         oio = self.cmis_client.create_content_object(data=properties, object_type="oio")
 
+        self.assertIsNotNone(oio.uuid)
         self.assertEqual(oio.informatieobject, properties["informatieobject"])
         self.assertEqual(oio.object_type, properties["object_type"])
         self.assertEqual(oio.besluit, properties["besluit"])
@@ -320,7 +323,7 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
         oio = self.cmis_client.create_content_object(data=properties, object_type="oio")
 
         retrieved_oio = self.cmis_client.get_content_object(
-            uuid=oio.objectId, object_type="oio"
+            drc_uuid=oio.uuid, object_type="oio"
         )
 
         self.assertEqual(oio.informatieobject, retrieved_oio.informatieobject)
@@ -341,7 +344,7 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
         )
 
         retrieved_gebruiksrechten = self.cmis_client.get_content_object(
-            uuid=gebruiksrechten.objectId, object_type="gebruiksrechten"
+            drc_uuid=gebruiksrechten.uuid, object_type="gebruiksrechten"
         )
 
         self.assertEqual(
@@ -359,27 +362,23 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
 
     def test_get_non_existing_gebruiksrechten(self):
         with self.assertRaises(DocumentDoesNotExistError):
-            invented_object_id = (
-                "workspace://SpacesStore/d06f86e0-1c3a-49cf-b5cd-01c079cf8147"
-            )
+            invented_uuid = "d06f86e0-1c3a-49cf-b5cd-01c079cf8147"
             self.cmis_client.get_content_object(
-                uuid=invented_object_id, object_type="gebruiksrechten"
+                drc_uuid=invented_uuid, object_type="gebruiksrechten"
             )
 
     def test_get_non_existing_oio(self):
         with self.assertRaises(DocumentDoesNotExistError):
-            invented_object_id = (
-                "workspace://SpacesStore/d06f86e0-1c3a-49cf-b5cd-01c079cf8147"
-            )
+            invented_uuid = "d06f86e0-1c3a-49cf-b5cd-01c079cf8147"
             self.cmis_client.get_content_object(
-                uuid=invented_object_id, object_type="oio"
+                drc_uuid=invented_uuid, object_type="oio"
             )
 
     def test_delete_oio(self):
         oio = self.cmis_client.create_content_object(data={}, object_type="oio")
         oio.delete_object()
         with self.assertRaises(DocumentDoesNotExistError):
-            self.cmis_client.get_content_object(uuid=oio.objectId, object_type="oio")
+            self.cmis_client.get_content_object(drc_uuid=oio.uuid, object_type="oio")
 
     def test_delete_gebruiksrechten(self):
         gebruiksrechten = self.cmis_client.create_content_object(
@@ -388,7 +387,7 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
         gebruiksrechten.delete_object()
         with self.assertRaises(DocumentDoesNotExistError):
             self.cmis_client.get_content_object(
-                uuid=gebruiksrechten.objectId, object_type="gebruiksrechten"
+                drc_uuid=gebruiksrechten.uuid, object_type="gebruiksrechten"
             )
 
 
@@ -1277,6 +1276,7 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
             identification=identification, data=properties, content=content,
         )
 
+        self.assertIsNotNone(document.uuid)
         self.assertEqual(document.identificatie, identification)
         self.assertEqual(document.bronorganisatie, "159351741")
         self.assertEqual(
@@ -1313,10 +1313,10 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
             identification=identification, data=properties
         )
 
+        self.assertIsNotNone(document.uuid)
         self.assertEqual(
             document.creatiedatum, properties["creatiedatum"],
         )
-
         self.assertEqual(
             document.begin_registratie, properties["begin_registratie"],
         )
@@ -1367,11 +1367,10 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
             identification=str(uuid.uuid4()), data=data
         )
         lock = str(uuid.uuid4())
-        doc_uuid = document.objectId.split("/")[-1]
 
         self.assertIs(document.get_private_working_copy(), None)
 
-        self.cmis_client.lock_document(uuid=doc_uuid, lock=lock)
+        self.cmis_client.lock_document(drc_uuid=document.uuid, lock=lock)
 
         pwc = document.get_private_working_copy()
         self.assertEqual(pwc.baseTypeId, "cmis:document")
@@ -1385,12 +1384,11 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
             identification=str(uuid.uuid4()), data=data
         )
         lock = str(uuid.uuid4())
-        doc_uuid = document.objectId.split("/")[-1]
 
-        self.cmis_client.lock_document(uuid=doc_uuid, lock=lock)
+        self.cmis_client.lock_document(drc_uuid=document.uuid, lock=lock)
 
         with self.assertRaises(DocumentLockedException):
-            self.cmis_client.lock_document(uuid=doc_uuid, lock=lock)
+            self.cmis_client.lock_document(drc_uuid=document.uuid, lock=lock)
 
     def test_unlock_document(self):
         data = {
@@ -1401,14 +1399,15 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
             identification=str(uuid.uuid4()), data=data
         )
         lock = str(uuid.uuid4())
-        doc_uuid = document.objectId.split("/")[-1]
 
-        self.cmis_client.lock_document(uuid=doc_uuid, lock=lock)
+        self.cmis_client.lock_document(drc_uuid=document.uuid, lock=lock)
 
         pwc = document.get_private_working_copy()
         self.assertEqual(pwc.baseTypeId, "cmis:document")
 
-        unlocked_doc = self.cmis_client.unlock_document(uuid=doc_uuid, lock=lock)
+        unlocked_doc = self.cmis_client.unlock_document(
+            drc_uuid=document.uuid, lock=lock
+        )
 
         self.assertIs(unlocked_doc.get_private_working_copy(), None)
 
@@ -1421,12 +1420,13 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
             identification=str(uuid.uuid4()), data=data
         )
         lock = str(uuid.uuid4())
-        doc_uuid = document.objectId.split("/")[-1]
 
-        self.cmis_client.lock_document(uuid=doc_uuid, lock=lock)
+        self.cmis_client.lock_document(drc_uuid=document.uuid, lock=lock)
 
         with self.assertRaises(LockDidNotMatchException):
-            self.cmis_client.unlock_document(uuid=doc_uuid, lock=str(uuid.uuid4()))
+            self.cmis_client.unlock_document(
+                drc_uuid=document.uuid, lock=str(uuid.uuid4())
+            )
 
     def test_force_unlock(self):
         data = {
@@ -1437,15 +1437,14 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
             identification=str(uuid.uuid4()), data=data
         )
         lock = str(uuid.uuid4())
-        doc_uuid = document.objectId.split("/")[-1]
 
-        self.cmis_client.lock_document(uuid=doc_uuid, lock=lock)
+        self.cmis_client.lock_document(drc_uuid=document.uuid, lock=lock)
 
         pwc = document.get_private_working_copy()
         self.assertEqual(pwc.baseTypeId, "cmis:document")
 
         unlocked_doc = self.cmis_client.unlock_document(
-            uuid=doc_uuid, lock=str(uuid.uuid4()), force=True
+            drc_uuid=document.uuid, lock=str(uuid.uuid4()), force=True
         )
 
         self.assertIs(unlocked_doc.get_private_working_copy(), None)
@@ -1469,7 +1468,6 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
         document = self.cmis_client.create_document(
             identification=identification, data=properties, content=content,
         )
-        doc_id = document.objectId.split("/")[-1]
 
         new_properties = {
             "auteur": "updated auteur",
@@ -1479,11 +1477,13 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
         new_content = io.BytesIO(b"Content after update")
 
         lock = str(uuid.uuid4())
-        self.cmis_client.lock_document(uuid=doc_id, lock=lock)
+        self.cmis_client.lock_document(drc_uuid=document.uuid, lock=lock)
         self.cmis_client.update_document(
-            uuid=doc_id, lock=lock, data=new_properties, content=new_content
+            drc_uuid=document.uuid, lock=lock, data=new_properties, content=new_content
         )
-        updated_doc = self.cmis_client.unlock_document(uuid=doc_id, lock=lock)
+        updated_doc = self.cmis_client.unlock_document(
+            drc_uuid=document.uuid, lock=lock
+        )
 
         self.assertEqual(updated_doc.identificatie, identification)
         self.assertEqual(updated_doc.bronorganisatie, "159351741")
@@ -1499,6 +1499,7 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
         self.assertEqual(updated_doc.link, "http://an.updated.link")
         self.assertEqual(updated_doc.beschrijving, "updated beschrijving")
         self.assertEqual(updated_doc.vertrouwelijkheidaanduiding, "openbaar")
+        self.assertEqual(updated_doc.uuid, document.uuid)
 
         # Retrieving the content
         posted_content = updated_doc.get_content_stream()
@@ -1515,7 +1516,6 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
         document = self.cmis_client.create_document(
             identification=identification, data=properties,
         )
-        doc_id = document.objectId.split("/")[-1]
 
         new_properties = {
             "auteur": "updated auteur",
@@ -1523,7 +1523,7 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
 
         with self.assertRaises(DocumentNotLockedException):
             self.cmis_client.update_document(
-                uuid=doc_id, lock=str(uuid.uuid4()), data=new_properties
+                drc_uuid=document.uuid, lock=str(uuid.uuid4()), data=new_properties
             )
 
     def test_copy_document(self):
@@ -1562,6 +1562,7 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
                 "cmis:" in property_name
                 or "titel" in property_name
                 or "kopie_van" in property_name
+                or "uuid" in property_name
             ):
                 continue
             self.assertEqual(
@@ -1569,3 +1570,4 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
             )
 
         self.assertEqual(copied_document.kopie_van, document.uuid)
+        self.assertNotEqual(copied_document.uuid, document.uuid)

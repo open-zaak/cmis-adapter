@@ -43,6 +43,7 @@ class EnkelvoudigInformatieObject:
 
 @dataclass
 class Gebruiksrechten:
+    uuid: str
     version_label: Decimal
     object_type_id: Id
     name: str
@@ -55,6 +56,7 @@ class Gebruiksrechten:
 
 @dataclass
 class Oio:
+    uuid: str
     version_label: Decimal
     object_type_id: Id
     name: str

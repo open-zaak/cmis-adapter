@@ -47,6 +47,7 @@ DOCUMENT_MAP = {
 
 GEBRUIKSRECHTEN_MAP = {
     "object_type_id": None,
+    "uuid": None,
     "informatieobject": None,
     "omschrijving_voorwaarden": None,
     "startdatum": None,
@@ -56,6 +57,7 @@ GEBRUIKSRECHTEN_MAP = {
 
 OBJECTINFORMATIEOBJECT_MAP = {
     "object_type_id": None,
+    "uuid": None,
     "informatieobject": None,
     "object_type": None,
     "zaak": None,

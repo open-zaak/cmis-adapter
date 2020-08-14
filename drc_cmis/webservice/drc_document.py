@@ -18,6 +18,7 @@ from drc_cmis.utils.utils import get_random_string
 from drc_cmis.webservice.data_models import (
     EnkelvoudigInformatieObject,
     Gebruiksrechten as GebruiksrechtenDoc,
+    Oio as OioDoc,
     ZaakFolderData,
     ZaakTypeFolderData,
     get_cmis_type,
@@ -198,6 +199,9 @@ class Document(CMISContentObject):
                 prop_type = get_cmis_type(EnkelvoudigInformatieObject, key)
                 props[prop_name] = {"value": "", "type": prop_type}
 
+        # For documents that are not new, the uuid shouldn't be written
+        props.pop(mapper("uuid"), None)
+
         if new:
             # increase likelihood of uniqueness of title by appending a random string
             title, suffix = data.get("titel"), get_random_string()
@@ -214,8 +218,10 @@ class Document(CMISContentObject):
                 prop_type = get_cmis_type(EnkelvoudigInformatieObject, "identificatie")
                 props[prop_name] = {"value": str(identification), "type": prop_type}
 
-        # can't or shouldn't be written
-        props.pop(mapper("uuid"), None)
+            # For new documents, the uuid needs to be set
+            prop_name = mapper("uuid")
+            prop_type = get_cmis_type(EnkelvoudigInformatieObject, "uuid")
+            props[prop_name] = {"value": str(uuid.uuid4()), "type": prop_type}
 
         return props
 
@@ -405,6 +411,8 @@ class Gebruiksrechten(CMISContentObject):
 class ObjectInformatieObject(CMISContentObject):
     table = "drc:oio"
     name_map = OBJECTINFORMATIEOBJECT_MAP
+    type_name = "oio"
+    type_class = OioDoc
 
 
 class Folder(CMISBaseObject):

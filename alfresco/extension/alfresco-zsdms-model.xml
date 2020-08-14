@@ -73,6 +73,14 @@
                         <tokenised>TRUE</tokenised>
                     </index>
                 </property>
+                <property name="drc:document__uuid">
+                    <title>DRC - Document - Unique Identifier</title>
+                    <type>d:text</type>
+                    <mandatory>true</mandatory>
+                    <index enabled="true">
+                        <tokenised>TRUE</tokenised>
+                    </index>
+                </property>
                 <property name="drc:document__verzenddatum">
                     <title>DRC - Document - Verzenddatum</title>
                     <type>d:date</type>
@@ -301,6 +309,14 @@
                         <tokenised>TRUE</tokenised>
                     </index>
                 </property>
+                <property name="drc:gebruiksrechten__uuid">
+                    <title>DRC - Gebruiksrechten - Unique Identifier</title>
+                    <type>d:text</type>
+                    <mandatory>true</mandatory>
+                    <index enabled="true">
+                        <tokenised>TRUE</tokenised>
+                    </index>
+                </property>
                 <property name="drc:gebruiksrechten__informatieobject">
                     <title>DRC - Informatieobject</title>
                     <type>d:text</type>
@@ -343,6 +359,14 @@
             <description>ObjectInformatieObject bevat de relaties tussen de documenten, zaaken en besluit objects</description>
             <parent>cm:content</parent>
             <properties>
+                <property name="drc:oio__uuid">
+                    <title>DRC - Oio - Unique Identifier</title>
+                    <type>d:text</type>
+                    <mandatory>true</mandatory>
+                    <index enabled="true">
+                        <tokenised>TRUE</tokenised>
+                    </index>
+                </property>
                 <property name="drc:oio__informatieobject">
                     <title>DRC - URL-referentie naar het INFORMATIEOBJECT</title>
                     <type>d:text</type>
