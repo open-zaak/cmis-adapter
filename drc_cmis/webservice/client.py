@@ -11,6 +11,7 @@ from cmislib.exceptions import UpdateConflictException
 
 from drc_cmis.client import CMISClient
 from drc_cmis.utils.exceptions import (
+    CmisRuntimeException,
     CmisUpdateConflictException,
     DocumentConflictException,
     DocumentDoesNotExistError,
@@ -65,10 +66,7 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
         if self._base_folder is None:
             # If no base folder has been specified, all the documents/folders will be created in the root folder
             if self.base_folder_name == "":
-                # root_folder_id is in the form workspace://SpacesStore/<uuid>
-                self._base_folder = self.get_folder(
-                    uuid=self.root_folder_id.split("/")[-1]
-                )
+                self._base_folder = self.get_folder(object_id=self.root_folder_id)
             else:
                 query = CMISQuery("SELECT * FROM cmis:folder WHERE IN_FOLDER('%s')")
 
@@ -197,31 +195,32 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
 
         return self.get_folder(folder_id)
 
-    def get_folder(self, uuid: str) -> Folder:
-        """Retrieve folder with objectId constructed with the uuid given"""
-
-        query = CMISQuery(
-            "SELECT * FROM cmis:folder WHERE cmis:objectId = 'workspace://SpacesStore/%s'"
-        )
+    def get_folder(self, object_id: str) -> Folder:
+        """Retrieve folder with given objectId"""
 
         soap_envelope = make_soap_envelope(
             auth=(self.user, self.password),
             repository_id=self.main_repo_id,
-            statement=query(uuid),
-            cmis_action="query",
+            object_id=object_id,
+            cmis_action="getObject",
         )
 
-        soap_response = self.request(
-            "DiscoveryService", soap_envelope=soap_envelope.toxml()
-        )
+        try:
+            soap_response = self.request(
+                "ObjectService", soap_envelope=soap_envelope.toxml()
+            )
+        except CmisRuntimeException as exc:
+            object_not_found_error = f"Object not found: {object_id}"
+            if object_not_found_error in exc.message:
+                error_string = f"Folder met objectId '{object_id}' bestaat niet in het CMIS connection"
+                raise FolderDoesNotExistError(error_string)
+            else:
+                raise exc
+
         xml_response = extract_xml_from_soap(soap_response)
-        num_items = extract_num_items(xml_response)
-        if num_items == 0:
-            error_string = f"Folder met objectId 'workspace://SpacesStore/{uuid}' bestaat niet in het CMIS connection"
-            does_not_exist = FolderDoesNotExistError(error_string)
-            raise does_not_exist
-
-        extracted_data = extract_object_properties_from_xml(xml_response, "query")[0]
+        extracted_data = extract_object_properties_from_xml(xml_response, "getObject")[
+            0
+        ]
         return Folder(extracted_data)
 
     def copy_document(self, document: Document, destination_folder: Folder) -> Document:
