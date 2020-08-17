@@ -210,24 +210,24 @@ class CMISClient:
             destination_folder=related_data_folder,
         )
 
-    def delete_content_object(self, uuid: Union[str, UUID], object_type: str):
+    def delete_content_object(self, drc_uuid: Union[str, UUID], object_type: str):
         """Delete the gebruiksrechten/objectinformatieobject with specified uuid
 
-        :param uuid: string or UUID, identifier that when combined with 'workspace://SpacesStore/' and the version
+        :param drc_uuid: string or UUID, the value of drc:oio__uuid/drc:gebruiksrechten__uuid
         number gives the cmis:objectId
         :param object_type: string, either "gebruiksrechten" or "oio"
         :return: Either a Gebruiksrechten or ObjectInformatieObject
         """
 
-        content_object = self.get_content_object(uuid, object_type=object_type)
+        content_object = self.get_content_object(drc_uuid, object_type=object_type)
         content_object.delete_object()
 
-    def delete_document(self, uuid: str) -> None:
-        """Delete all versions of a document with objectId workspace://SpacesStore/<uuid>
+    def delete_document(self, drc_uuid: str) -> None:
+        """Delete all versions of a document with given uuid
 
-        :param uuid: string, uuid used to create the objectId
+        :param drc_uuid: string, the value of drc:oio__uuid/drc:gebruiksrechten__uuid
         """
-        document = self.get_document(uuid=uuid)
+        document = self.get_document(drc_uuid=drc_uuid)
         document.delete_object()
 
     def get_or_create_zaaktype_folder(self, zaaktype: dict) -> Folder:

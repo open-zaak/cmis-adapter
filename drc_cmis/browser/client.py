@@ -298,9 +298,7 @@ class CMISDRCClient(CMISClient, CMISRequest):
             )
         except GetFirstException:
             object_title = object_type.capitalize()
-            error_string = (
-                f"{object_title} met uuid {uuid} bestaat niet in het CMIS connection"
-            )
+            error_string = f"{object_title} met uuid {drc_uuid} bestaat niet in het CMIS connection"
             raise DocumentDoesNotExistError(error_string)
 
     def create_document(

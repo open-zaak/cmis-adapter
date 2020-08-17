@@ -374,6 +374,12 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
                 drc_uuid=invented_uuid, object_type="oio"
             )
 
+    def test_delete_content_object(self):
+        oio = self.cmis_client.create_content_object(data={}, object_type="oio")
+        self.cmis_client.delete_content_object(drc_uuid=oio.uuid, object_type="oio")
+        with self.assertRaises(DocumentDoesNotExistError):
+            self.cmis_client.get_content_object(drc_uuid=oio.uuid, object_type="oio")
+
     def test_delete_oio(self):
         oio = self.cmis_client.create_content_object(data={}, object_type="oio")
         oio.delete_object()
@@ -1571,3 +1577,15 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
 
         self.assertEqual(copied_document.kopie_van, document.uuid)
         self.assertNotEqual(copied_document.uuid, document.uuid)
+
+    def test_delete_document(self):
+        data = {
+            "creatiedatum": datetime.date(2020, 7, 27),
+            "titel": "detailed summary",
+        }
+        document = self.cmis_client.create_document(
+            identification="00569792-f72f-420c-8b72-9c2fb9dd7601", data=data
+        )
+        self.cmis_client.delete_document(drc_uuid=document.uuid)
+        with self.assertRaises(DocumentDoesNotExistError):
+            self.cmis_client.get_document(drc_uuid=document.uuid)
