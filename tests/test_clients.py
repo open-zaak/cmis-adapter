@@ -507,11 +507,7 @@ class CMISClientOIOTests(DMSMixin, TestCase):
                 break
 
         self.assertEqual(zaaktype_folder.name, "zaaktype-Melding Openbare Ruimte-1")
-        zaak_folder = zaaktype_folder.get_children_folders()[0]
-        self.assertEqual(zaak_folder.name, "zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d")
-        children = zaak_folder.get_children_folders()
-        self.assertEqual(len(children), 1)
-        year_folder = children[0]
+        year_folder = zaaktype_folder.get_children_folders()[0]
         self.assertEqual(year_folder.name, "2020")
         children = year_folder.get_children_folders()
         self.assertEqual(len(children), 1)
@@ -521,8 +517,12 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         self.assertEqual(len(children), 1)
         day_folder = children[0]
         self.assertEqual(day_folder.name, "27")
+        zaak_folder = day_folder.get_children_folders()[0]
+        self.assertEqual(zaak_folder.name, "zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d")
 
-        self.assertEqual(day_folder.objectId, document.get_parent_folders()[0].objectId)
+        self.assertEqual(
+            zaak_folder.objectId, document.get_parent_folders()[0].objectId
+        )
 
     def test_create_zaak_oio_with_linked_document(self, m):
         # Mocking the retrieval of the Zaken
@@ -583,11 +583,7 @@ class CMISClientOIOTests(DMSMixin, TestCase):
                 zaaktype_folder = folder
                 break
 
-        zaak_folder = zaaktype_folder.get_children_folders()[0]
-        self.assertEqual(zaak_folder.name, "zaak-1717b1f0-16e5-42d4-ba28-cbce211bb94b")
-        children = zaak_folder.get_children_folders()
-        self.assertEqual(len(children), 1)
-        year_folder = children[0]
+        year_folder = zaaktype_folder.get_children_folders()[0]
         self.assertEqual(year_folder.name, "2020")
         children = year_folder.get_children_folders()
         self.assertEqual(len(children), 1)
@@ -597,9 +593,11 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         self.assertEqual(len(children), 1)
         day_folder = children[0]
         self.assertEqual(day_folder.name, "27")
+        zaak_folder = day_folder.get_children_folders()[0]
+        self.assertEqual(zaak_folder.name, "zaak-1717b1f0-16e5-42d4-ba28-cbce211bb94b")
 
         self.assertNotEqual(
-            day_folder.objectId, document.get_parent_folders()[0].objectId
+            zaak_folder.objectId, document.get_parent_folders()[0].objectId
         )
 
         # Check that there are 2 documents with the same identificatie
@@ -682,9 +680,7 @@ class CMISClientOIOTests(DMSMixin, TestCase):
                 break
 
         self.assertEqual(zaaktype_folder.name, "zaaktype-Melding Openbare Ruimte-1")
-        zaak_folder = zaaktype_folder.get_children_folders()[0]
-        self.assertEqual(zaak_folder.name, "zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d")
-        children = zaak_folder.get_children_folders()
+        children = zaaktype_folder.get_children_folders()
         self.assertEqual(len(children), 1)
         year_folder = children[0]
         self.assertEqual(year_folder.name, "2020")
@@ -696,8 +692,12 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         self.assertEqual(len(children), 1)
         day_folder = children[0]
         self.assertEqual(day_folder.name, "27")
+        zaak_folder = day_folder.get_children_folders()[0]
+        self.assertEqual(zaak_folder.name, "zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d")
 
-        self.assertEqual(day_folder.objectId, document.get_parent_folders()[0].objectId)
+        self.assertEqual(
+            zaak_folder.objectId, document.get_parent_folders()[0].objectId
+        )
 
     def test_create_besluit_oio_with_linked_document(self, m):
         # Mocking the retrieval of the Besluit
@@ -762,9 +762,7 @@ class CMISClientOIOTests(DMSMixin, TestCase):
                 zaaktype_folder = folder
                 break
 
-        zaak_folder = zaaktype_folder.get_children_folders()[0]
-        self.assertEqual(zaak_folder.name, "zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d")
-        children = zaak_folder.get_children_folders()
+        children = zaaktype_folder.get_children_folders()
         self.assertEqual(len(children), 1)
         year_folder = children[0]
         self.assertEqual(year_folder.name, "2020")
@@ -776,9 +774,11 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         self.assertEqual(len(children), 1)
         day_folder = children[0]
         self.assertEqual(day_folder.name, "27")
+        zaak_folder = day_folder.get_children_folders()[0]
+        self.assertEqual(zaak_folder.name, "zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d")
 
         self.assertNotEqual(
-            day_folder.objectId, document.get_parent_folders()[0].objectId
+            zaak_folder.objectId, document.get_parent_folders()[0].objectId
         )
 
         # Check that there are 2 documents with the same identificatie
@@ -1040,11 +1040,11 @@ class CMISClientOIOTests(DMSMixin, TestCase):
                 break
 
         self.assertEqual(zaaktype_folder.name, "zaaktype-Melding Openbare Ruimte-1")
-        zaak_folder = zaaktype_folder.get_children_folders()[0]
-        year_folder = zaak_folder.get_children_folders()[0]
+        year_folder = zaaktype_folder.get_children_folders()[0]
         month_folder = year_folder.get_children_folders()[0]
         day_folder = month_folder.get_children_folders()[0]
-        related_data_folder = day_folder.get_children_folders()[0]
+        zaak_folder = day_folder.get_children_folders()[0]
+        related_data_folder = zaak_folder.get_children_folders()[0]
 
         temporary_folder = self.get_temporary_folder(self.cmis_client.base_folder)
         related_data_temporary_folder = temporary_folder.get_children_folders()[0]

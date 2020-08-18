@@ -169,13 +169,13 @@ class CMISClient:
 
         # Get or create the destination folder
         zaaktype_folder = self.get_or_create_zaaktype_folder(zaaktype_data)
-        zaak_folder = self.get_or_create_zaak_folder(zaak_data, zaaktype_folder)
 
         now = timezone.now()
-        year_folder = self.get_or_create_folder(str(now.year), zaak_folder)
+        year_folder = self.get_or_create_folder(str(now.year), zaaktype_folder)
         month_folder = self.get_or_create_folder(str(now.month), year_folder)
         day_folder = self.get_or_create_folder(str(now.day), month_folder)
-        related_data_folder = self.get_or_create_folder("Related data", day_folder)
+        zaak_folder = self.get_or_create_zaak_folder(zaak_data, day_folder)
+        related_data_folder = self.get_or_create_folder("Related data", zaak_folder)
 
         # Check if there are other Oios related to the document
         retrieved_oios = self.query(
@@ -193,13 +193,13 @@ class CMISClient:
 
         # Case 1: Already related to a zaak. Copy the document to the destination folder.
         if len(retrieved_oios) > 0:
-            self.copy_document(document, day_folder)
+            self.copy_document(document, zaak_folder)
             if len(related_gebruiksrechten) > 0:
                 for gebruiksrechten in related_gebruiksrechten:
                     self.copy_gebruiksrechten(gebruiksrechten, related_data_folder)
         # Case 2: Not related to a zaak. Move the document to the destination folder
         else:
-            document.move_object(day_folder)
+            document.move_object(zaak_folder)
             if len(related_gebruiksrechten) > 0:
                 for gebruiksrechten in related_gebruiksrechten:
                     gebruiksrechten.move_object(related_data_folder)
