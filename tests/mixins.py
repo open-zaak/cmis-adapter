@@ -25,6 +25,10 @@ class DMSMixin:
                 client_password="admin",
                 base_folder_name="Zaken",
             )
+        else:
+            raise Exception(
+                "No CMIS binding set through CMIS_BINDING environment variable."
+            )
 
     def setUp(self):
         super().setUp()

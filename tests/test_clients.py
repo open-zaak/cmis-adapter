@@ -438,9 +438,12 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         "omschrijving": "Melding Openbare Ruimte",
     }
 
-    def _get_temporary_folder(self, base_folder):
+    def get_temporary_folder(self, base_folder):
         children = base_folder.get_children_folders()
-        year_folder = children[0]
+        for child in children:
+            if child.name == "2020":
+                year_folder = child
+                break
         children = year_folder.get_children_folders()
         month_folder = children[0]
         children = month_folder.get_children_folders()
@@ -1011,7 +1014,7 @@ class CMISClientOIOTests(DMSMixin, TestCase):
             identification=identification, data=properties, content=content,
         )
 
-        # Creating the oio must leave the document in the temporary folder
+        # Creating the oio leaves the document in the temporary folder
         oio_besluit_data = {
             "object": self.besluit_without_zaak_url,
             "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
@@ -1043,7 +1046,7 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         day_folder = month_folder.get_children_folders()[0]
         related_data_folder = day_folder.get_children_folders()[0]
 
-        temporary_folder = self._get_temporary_folder(self.cmis_client.base_folder)
+        temporary_folder = self.get_temporary_folder(self.cmis_client.base_folder)
         related_data_temporary_folder = temporary_folder.get_children_folders()[0]
 
         self.assertEqual(
