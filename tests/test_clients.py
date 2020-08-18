@@ -206,34 +206,6 @@ class CMISClientNoBaseFolderTests(DMSMixin, TestCase):
         # while web service binding returns objectId's as "workspace://SpacesStore/951172cc-9b59-4346-b4be-d3a4e1c3c0f1"
         self.assertEqual(base_folder.objectId, self.cmis_client.root_folder_id)
 
-    @skip("TODO")
-    def test_delete_base_tree(self):
-        base_folder = self.cmis_client.base_folder
-
-        children_before = base_folder.get_children_folders()
-        folder1 = self.cmis_client.create_folder("TestFolder1", base_folder.objectId)
-        folder2 = self.cmis_client.create_folder("TestFolder2", base_folder.objectId)
-        folder3 = self.cmis_client.create_folder("TestFolder3", base_folder.objectId)
-
-        children_after = base_folder.get_children_folders()
-        self.assertEqual(len(children_after), 3 + len(children_before))
-
-        self.cmis_client.delete_cmis_folders_in_base()
-
-        self.assertEqual(
-            self.cmis_client.base_folder.objectId, self.cmis_client.root_folder_id
-        )
-
-        self.assertRaises(
-            FolderDoesNotExistError, self.cmis_client.get_folder, folder1.objectId,
-        )
-        self.assertRaises(
-            FolderDoesNotExistError, self.cmis_client.get_folder, folder2.objectId,
-        )
-        self.assertRaises(
-            FolderDoesNotExistError, self.cmis_client.get_folder, folder3.objectId,
-        )
-
 
 @freeze_time("2020-07-27 12:00:00")
 class CMISClientContentObjectsTests(DMSMixin, TestCase):
@@ -426,6 +398,18 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         "ingangsdatum": "2018-10-01",
         "vervaldatum": "2018-11-01",
     }
+    besluit_without_zaak_url = (
+        f"{base_besluit_url}besluit/43d2f02f-a539-41a6-9494-3360fa9a670d"
+    )
+    besluit_without_zaak = {
+        "verantwoordelijke_organisatie": "517439943",
+        "identificatie": "123123",
+        "besluittype": f"http://testserver/besluittype/some-random-id",
+        "datum": "2018-09-06",
+        "toelichting": "Vergunning verleend.",
+        "ingangsdatum": "2018-10-01",
+        "vervaldatum": "2018-11-01",
+    }
 
     zaaktype_url = f"{base_zaaktype_url}zaaktypen/0119dd4e-7be9-477e-bccf-75023b1453c1"
     zaaktype = {
@@ -453,6 +437,15 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         "identificatie": 2,
         "omschrijving": "Melding Openbare Ruimte",
     }
+
+    def _get_temporary_folder(self, base_folder):
+        children = base_folder.get_children_folders()
+        year_folder = children[0]
+        children = year_folder.get_children_folders()
+        month_folder = children[0]
+        children = month_folder.get_children_folders()
+        day_folder = children[0]
+        return day_folder
 
     def test_create_zaak_oio_with_unlinked_document(self, m):
         # Mocking the retrieval of the Zaak
@@ -942,6 +935,126 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         self.assertEqual(
             oio.informatieobject,
             f"https://testserver/api/v1/documenten/{document.uuid}",
+        )
+
+    def test_create_besluit_without_zaak(self, m):
+        # Mocking the retrieval of the Besluit
+        m.get(self.besluit_url, json=self.besluit)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_besluit_url)
+        m.get(self.besluit_without_zaak_url, json=self.besluit_without_zaak)
+        mock_service_oas_get(
+            m=m, service="zrc-openapi", url=self.besluit_without_zaak_url
+        )
+
+        # Creating the document in the temporary folder
+        identification = str(uuid.uuid4())
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties, content=content,
+        )
+
+        # Get the temporary folder
+        children = self.cmis_client.base_folder.get_children_folders()
+        year_folder = children[0]
+        children = year_folder.get_children_folders()
+        month_folder = children[0]
+        children = month_folder.get_children_folders()
+        day_folder = children[0]
+
+        # Creating the oio must leave the document in the temporary folder
+        oio = {
+            "object": self.besluit_without_zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "besluit",
+        }
+        self.cmis_client.create_oio(oio)
+
+        self.assertEqual(day_folder.objectId, document.get_parent_folders()[0].objectId)
+
+    def test_link_zaak_to_document_with_existing_besluit(self, m):
+        # Mocking the retrieval of the Besluit
+        m.get(self.besluit_url, json=self.besluit)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_besluit_url)
+        m.get(self.besluit_without_zaak_url, json=self.besluit_without_zaak)
+        mock_service_oas_get(
+            m=m, service="zrc-openapi", url=self.besluit_without_zaak_url
+        )
+
+        # Mocking the retrieval of the Zaak
+        m.get(self.zaak_url, json=self.zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktype
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        identification = str(uuid.uuid4())
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties, content=content,
+        )
+
+        # Creating the oio must leave the document in the temporary folder
+        oio_besluit_data = {
+            "object": self.besluit_without_zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "besluit",
+        }
+        oio_besluit = self.cmis_client.create_oio(oio_besluit_data)
+
+        # Creating another oio linking to a zaak should move the besluit oio
+        # and the document to the new zaaktype/zaak folder
+        oio_zaak_data = {
+            "object": self.zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        oio_zaak = self.cmis_client.create_oio(oio_zaak_data)
+
+        # Get new folder structure
+        children = self.cmis_client.base_folder.get_children_folders()
+        self.assertEqual(len(children), 2)
+        for child in children:
+            if child.name != "2020":
+                zaaktype_folder = child
+                break
+
+        self.assertEqual(zaaktype_folder.name, "zaaktype-Melding Openbare Ruimte-1")
+        zaak_folder = zaaktype_folder.get_children_folders()[0]
+        year_folder = zaak_folder.get_children_folders()[0]
+        month_folder = year_folder.get_children_folders()[0]
+        day_folder = month_folder.get_children_folders()[0]
+        related_data_folder = day_folder.get_children_folders()[0]
+
+        temporary_folder = self._get_temporary_folder(self.cmis_client.base_folder)
+        related_data_temporary_folder = temporary_folder.get_children_folders()[0]
+
+        self.assertEqual(
+            related_data_folder.objectId, oio_zaak.get_parent_folders()[0].objectId
+        )
+        self.assertEqual(
+            related_data_temporary_folder.objectId,
+            oio_besluit.get_parent_folders()[0].objectId,
+        )
+        self.assertEqual(
+            temporary_folder.objectId, document.get_parent_folders()[0].objectId
         )
 
 

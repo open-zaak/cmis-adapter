@@ -112,15 +112,24 @@ class CMISClient:
     def create_oio(self, data: dict) -> ObjectInformatieObject:
         """Create ObjectInformatieObject which relates a document with a zaak or besluit
 
-        There are 2 possible cases:
-        1. The document is already related to a zaak: a copy of the document is put in the
-            correct zaaktype/zaak folder.
-        2. The document is not related to anything: the document is moved from the temporary folder
+        There are a few possible cases.
+        1. The oio creates a link to a Besluit:
+            A. The besluit is linked to a zaak:
+                - If the document is NOT already linked to a zaak, it is moved from the temporary folder to
+                    the zaak folder
+                - If the document is already linked to a zaak, it will be copied to the new zaak folder
+            B. The besluit is not linked to a zaak:
+                - If the document is NOT already linked to a zaak, the oio is created in the temporary folder and the
+                    document is NOT moved
+                - If the document is already linked to a zaak, the document is not moved and the oio will go
+                    in the temporary folder
+        2. The oio creates a link to a Zaak:
+            A. If the document is already related to a zaak, a copy of the document is put in the
+                correct zaaktype/zaak folder.
+            B. If the document is NOT related to a zaak: the document is moved from the temporary folder
             to the correct zaaktype/zaak folder.
 
-        If the oio creates a link to a besluit, the zaak/zaaktype need to be retrieved from the besluit.
-
-        If the document is linked already to a gebruiks rechten, then the gebruiksrechten object is also moved.
+        If the document is linked already to a gebruiksrechten, then the gebruiksrechten object is also moved.
 
         :param data: dict, the oio details.
         :return: Oio created
@@ -138,7 +147,19 @@ class CMISClient:
         if data["object_type"] == "besluit":
             client_besluit = get_zds_client(data["besluit"])
             besluit_data = client_besluit.retrieve("besluit", url=data["besluit"])
-            zaak_url = besluit_data["zaak"]
+            zaak_url = besluit_data.get("zaak")
+            if zaak_url is None:
+                # The besluit is created in the temporary folder, since it is not related to a zaak
+                now = timezone.now()
+                year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
+                month_folder = self.get_or_create_folder(str(now.month), year_folder)
+                day_folder = self.get_or_create_folder(str(now.day), month_folder)
+                related_data_folder = self.get_or_create_folder(
+                    "Related data", day_folder
+                )
+                return self.create_content_object(
+                    data=data, object_type="oio", destination_folder=related_data_folder
+                )
         else:
             zaak_url = data["zaak"]
         client_zaak = get_zds_client(zaak_url)
