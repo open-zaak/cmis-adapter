@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <model xmlns="http://www.alfresco.org/model/dictionary/1.0" name="drc:drc-document">
-    <description>Hier komt een beschrijving te staan</description>
-    <author>Gemeente Utrecht</author>
+    <description>Alfresco content model to add support for Open Zaak using the CMIS-adapter.</description>
+    <author>Open Zaak</author>
+    <version>1.0</version>
     <imports>
         <import uri="http://www.alfresco.org/model/content/1.0" prefix="cm"/>
         <import uri="http://www.alfresco.org/model/dictionary/1.0" prefix="d"/>
     </imports>
     <namespaces>
-        <namespace uri="http://utrecht.nl/model/1.0" prefix="drc"/>
+        <namespace uri="http://www.openzaak.nl/model/documenten/1.0" prefix="drc"/>
     </namespaces>
     <data-types/>
     <constraints/>
