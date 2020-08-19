@@ -84,13 +84,16 @@ class CMISDRCClient(CMISClient, CMISRequest):
         return repo_info["-default-"]["vendorName"]
 
     # generic querying
-    def query(self, return_type_name: str, lhs: List[str], rhs: List[str]):
+    def query(
+        self, return_type_name: str, lhs: List[str] = None, rhs: List[str] = None
+    ):
         return_type = self.get_return_type(return_type_name)
         table = return_type.table
         where = (" WHERE " + " AND ".join(lhs)) if lhs else ""
         query = CMISQuery("SELECT * FROM %s%s" % (table, where))
+        statement = query(*rhs) if rhs else query()
 
-        body = {"cmisaction": "query", "statement": query(*rhs)}
+        body = {"cmisaction": "query", "statement": statement}
         response = self.post_request(self.base_url, body)
         logger.debug(response)
         return self.get_all_results(response, return_type)

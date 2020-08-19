@@ -32,6 +32,7 @@ from drc_cmis.webservice.data_models import (
     get_cmis_type,
 )
 from drc_cmis.webservice.drc_document import (
+    CMISBaseObject,
     CMISContentObject,
     Document,
     Folder,
@@ -125,8 +126,8 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
         return repo_info["vendorName"]
 
     def query(
-        self, return_type_name: str, lhs: List[str], rhs: List[str]
-    ) -> List[Union[Document, Gebruiksrechten, ObjectInformatieObject]]:
+        self, return_type_name: str, lhs: List[str] = None, rhs: List[str] = None
+    ) -> List[CMISBaseObject]:
         """Perform an SQL query in the DMS
 
         :param return_type_name: string, either Folder, Document, Oio or Gebruiksrechten
@@ -138,11 +139,12 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
         table = return_type.table
         where = (" WHERE " + " AND ".join(lhs)) if lhs else ""
         query = CMISQuery("SELECT * FROM %s%s" % (table, where))
+        statement = query(*rhs) if rhs else query()
 
         soap_envelope = make_soap_envelope(
             auth=(self.user, self.password),
             repository_id=self.main_repo_id,
-            statement=query(*rhs),
+            statement=statement,
             cmis_action="query",
         )
 

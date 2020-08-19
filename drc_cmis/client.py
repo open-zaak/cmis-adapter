@@ -120,16 +120,16 @@ class CMISClient:
                 - If the document is already linked to a zaak, it will be copied to the new zaak folder
             B. The besluit is not linked to a zaak:
                 - If the document is NOT already linked to a zaak, the oio is created in the temporary folder and the
-                    document is NOT moved
-                - If the document is already linked to a zaak, the document is not moved and the oio will go
-                    in the temporary folder
+                    document remains in the temporary folder
+                - If the document is already linked to a zaak, the document is copied to the temporary folder and
+                    the oio is created in the temporary folder
         2. The oio creates a link to a Zaak:
             A. If the document is already related to a zaak, a copy of the document is put in the
                 correct zaaktype/zaak folder.
             B. If the document is NOT related to a zaak: the document is moved from the temporary folder
             to the correct zaaktype/zaak folder.
 
-        If the document is linked already to a gebruiksrechten, then the gebruiksrechten object is also moved.
+        If the document is linked already to a gebruiksrechten, then the gebruiksrechten object is also moved/copied.
 
         :param data: dict, the oio details.
         :return: Oio created
@@ -148,34 +148,36 @@ class CMISClient:
             client_besluit = get_zds_client(data["besluit"])
             besluit_data = client_besluit.retrieve("besluit", url=data["besluit"])
             zaak_url = besluit_data.get("zaak")
-            if zaak_url is None:
-                # The besluit is created in the temporary folder, since it is not related to a zaak
-                now = timezone.now()
-                year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
-                month_folder = self.get_or_create_folder(str(now.month), year_folder)
-                day_folder = self.get_or_create_folder(str(now.day), month_folder)
-                related_data_folder = self.get_or_create_folder(
-                    "Related data", day_folder
-                )
-                return self.create_content_object(
-                    data=data, object_type="oio", destination_folder=related_data_folder
-                )
         else:
             zaak_url = data["zaak"]
-        client_zaak = get_zds_client(zaak_url)
-        zaak_data = client_zaak.retrieve("zaak", url=zaak_url)
-        client_zaaktype = get_zds_client(zaak_data["zaaktype"])
-        zaaktype_data = client_zaaktype.retrieve("zaaktype", url=zaak_data["zaaktype"])
 
-        # Get or create the destination folder
-        zaaktype_folder = self.get_or_create_zaaktype_folder(zaaktype_data)
+        # The oio for the besluit is created in the "Related data" of the temporary folder,
+        # since it is not related to a zaak
+        if zaak_url is None:
+            now = timezone.now()
+            year_folder = self.get_or_create_folder(str(now.year), self.base_folder)
+            month_folder = self.get_or_create_folder(str(now.month), year_folder)
+            destination_folder = self.get_or_create_folder(str(now.day), month_folder)
+        # The oio is created in the "Related data" folder of the zaak folder
+        else:
+            client_zaak = get_zds_client(zaak_url)
+            zaak_data = client_zaak.retrieve("zaak", url=zaak_url)
+            client_zaaktype = get_zds_client(zaak_data["zaaktype"])
+            zaaktype_data = client_zaaktype.retrieve(
+                "zaaktype", url=zaak_data["zaaktype"]
+            )
 
-        now = timezone.now()
-        year_folder = self.get_or_create_folder(str(now.year), zaaktype_folder)
-        month_folder = self.get_or_create_folder(str(now.month), year_folder)
-        day_folder = self.get_or_create_folder(str(now.day), month_folder)
-        zaak_folder = self.get_or_create_zaak_folder(zaak_data, day_folder)
-        related_data_folder = self.get_or_create_folder("Related data", zaak_folder)
+            # Get or create the destination folder
+            now = timezone.now()
+            zaaktype_folder = self.get_or_create_zaaktype_folder(zaaktype_data)
+            year_folder = self.get_or_create_folder(str(now.year), zaaktype_folder)
+            month_folder = self.get_or_create_folder(str(now.month), year_folder)
+            day_folder = self.get_or_create_folder(str(now.day), month_folder)
+            destination_folder = self.get_or_create_zaak_folder(zaak_data, day_folder)
+
+        related_data_folder = self.get_or_create_folder(
+            "Related data", destination_folder
+        )
 
         # Check if there are other Oios related to the document
         retrieved_oios = self.query(
@@ -193,18 +195,18 @@ class CMISClient:
 
         # Case 1: Already related to a zaak. Copy the document to the destination folder.
         if len(retrieved_oios) > 0:
-            self.copy_document(document, zaak_folder)
+            self.copy_document(document, destination_folder)
             if len(related_gebruiksrechten) > 0:
                 for gebruiksrechten in related_gebruiksrechten:
                     self.copy_gebruiksrechten(gebruiksrechten, related_data_folder)
         # Case 2: Not related to a zaak. Move the document to the destination folder
         else:
-            document.move_object(zaak_folder)
+            document.move_object(destination_folder)
             if len(related_gebruiksrechten) > 0:
                 for gebruiksrechten in related_gebruiksrechten:
                     gebruiksrechten.move_object(related_data_folder)
 
-        # Create the Oio in a separate folder
+        # Create the Oio in the "Related data" folder
         return self.create_content_object(
             data=data, object_type="oio", destination_folder=related_data_folder
         )

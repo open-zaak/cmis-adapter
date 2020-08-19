@@ -1060,6 +1060,81 @@ class CMISClientOIOTests(DMSMixin, TestCase):
             temporary_folder.objectId, document.get_parent_folders()[0].objectId
         )
 
+    def test_link_besluit_without_zaak_to_document_linked_to_zaak(self, m):
+        # Mocking the retrieval of the Besluit
+        m.get(self.besluit_url, json=self.besluit)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_besluit_url)
+        m.get(self.besluit_without_zaak_url, json=self.besluit_without_zaak)
+        mock_service_oas_get(
+            m=m, service="zrc-openapi", url=self.besluit_without_zaak_url
+        )
+
+        # Mocking the retrieval of the Zaak
+        m.get(self.zaak_url, json=self.zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktype
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        identification = str(uuid.uuid4())
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification=identification, data=properties, content=content,
+        )
+
+        # Link document to zaak
+        oio_zaak_data = {
+            "object": self.zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        self.cmis_client.create_oio(oio_zaak_data)
+
+        # Check that only one document exists
+        documents = self.cmis_client.query(return_type_name="Document",)
+        self.assertEqual(len(documents), 1)
+
+        # Link document to besluit, but the besluit is not linked to a zaak
+        oio_besluit_data = {
+            "object": self.besluit_without_zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "besluit",
+        }
+        oio_besluit = self.cmis_client.create_oio(oio_besluit_data)
+
+        temporary_folder = self.get_temporary_folder(self.cmis_client.base_folder)
+        related_data_folder = temporary_folder.get_children_folders()[0]
+
+        self.assertEqual(
+            related_data_folder.objectId, oio_besluit.get_parent_folders()[0].objectId
+        )
+
+        # A copy of the  document has been added to the temporary folder
+        documents = self.cmis_client.query(return_type_name="Document",)
+        self.assertEqual(len(documents), 2)
+        document_titles = [doc.titel for doc in documents]
+        self.assertIn("detailed summary", document_titles)
+        self.assertIn("detailed summary - copy", document_titles)
+
+        document_copy = (
+            documents[0]
+            if documents[0].titel == "detailed summary - copy"
+            else documents[1]
+        )
+        self.assertEqual(
+            temporary_folder.objectId, document_copy.get_parent_folders()[0].objectId
+        )
+
 
 @freeze_time("2020-07-27 12:00:00")
 @requests_mock.Mocker(real_http=True)  # real HTTP for the Alfresco requests
