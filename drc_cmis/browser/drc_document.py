@@ -343,3 +343,16 @@ class ZaakFolder(CMISBaseObject):
     table = "drc:zaakfolder"
     name_map = ZAAK_MAP
     type_name = "zaak"
+
+    def get_children_documents(self) -> List[Document]:
+        """Get all the documents in a zaak folder
+
+        :return: list of documents
+        """
+        data = {
+            "cmisaction": "query",
+            "statement": f"SELECT * FROM drc:document WHERE IN_FOLDER('{self.objectId}')",
+        }
+        json_response = self.post_request(self.base_url, data=data)
+
+        return self.get_all_results(json_response, Document)

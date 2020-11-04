@@ -527,3 +527,30 @@ class ZaakFolder(CMISBaseObject):
     name_map = ZAAK_MAP
     type_name = "zaak"
     type_class = ZaakFolderData
+
+    def get_children_documents(self) -> List[Document]:
+        """Get all the documents in a zaak folder
+
+        :return: list of documents
+        """
+        # In Corsa, the query "SELECT * FROM cmis:document WHERE IN_FOLDER('objectId')" doesnt work
+        # Operation getChildren returns all the children (including folders)
+        soap_envelope = make_soap_envelope(
+            auth=(self.user, self.password),
+            repository_id=self.main_repo_id,
+            folder_id=self.objectId,
+            cmis_action="getChildren",
+        )
+
+        soap_response = self.request(
+            "NavigationService", soap_envelope=soap_envelope.toxml()
+        )
+
+        xml_response = extract_xml_from_soap(soap_response)
+        extracted_data = extract_object_properties_from_xml(xml_response, "getChildren")
+
+        return [
+            Document(data)
+            for data in extracted_data
+            if "drc:document" in data["properties"]["cmis:objectTypeId"]["value"]
+        ]

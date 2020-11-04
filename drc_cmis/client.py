@@ -250,6 +250,9 @@ class CMISClient:
             rhs=[data.get("informatieobject")],
         )
 
+        # Get the parent folder to check if the document is in a Zaak folder
+        parent_folder = document.get_parent_folders()[0]
+
         # Check if there are gebruiksrechten related to the document
         related_gebruiksrechten = self.query(
             return_type_name="gebruiksrechten",
@@ -258,7 +261,7 @@ class CMISClient:
         )
 
         # Case 1: Already related to a zaak. Copy the document to the destination folder.
-        if len(retrieved_oios) > 0:
+        if len(retrieved_oios) > 0 or "drc:zaakfolder" in parent_folder.objectTypeId:
             self.copy_document(document, destination_folder)
             if len(related_gebruiksrechten) > 0:
                 for gebruiksrechten in related_gebruiksrechten:
@@ -378,3 +381,20 @@ class CMISClient:
             parent_folder = self.get_or_create_folder(folder_name, parent_folder, props)
 
         return parent_folder
+
+    def get_documents_related_to_zaak(self, identificatie: str) -> List[Document]:
+        """Get all documents in the zaak folder with drc:zaakfolder__identificatie.
+
+        :param identificatie: str, identification of the zaak
+        :return: list of Documents
+        """
+
+        zaak_folder = self.query(
+            return_type_name="zaakfolder",
+            lhs=["drc:zaak__identificatie = '%s'"],
+            rhs=[str(identificatie)],
+        )[0]
+
+        documents = zaak_folder.get_children_documents()
+
+        return documents

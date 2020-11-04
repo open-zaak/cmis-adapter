@@ -466,18 +466,6 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         "omschrijving": "Melding Openbare Ruimte",
     }
 
-    def get_temporary_folder(self, base_folder):
-        children = base_folder.get_children_folders()
-        for child in children:
-            if child.name == "2020":
-                year_folder = child
-                break
-        children = year_folder.get_children_folders()
-        month_folder = children[0]
-        children = month_folder.get_children_folders()
-        day_folder = children[0]
-        return day_folder
-
     def test_create_zaak_oio_with_unlinked_document(self, m):
         # Mocking the retrieval of the Zaak
         m.get(self.zaak_url, json=self.zaak)
@@ -1184,6 +1172,137 @@ class CMISClientOIOTests(DMSMixin, TestCase):
         )
         self.assertEqual(
             other_folder.objectId, document_copy.get_parent_folders()[0].objectId
+        )
+
+    def test_create_document_in_zaakfolder_without_oio(self, m):
+        # Mocking the retrieval of the Zaak
+        m.get(self.zaak_url, json=self.zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktype
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification="9124c668-db3f-4198-8823-4c21fed430d0",
+            data=properties,
+            content=content,
+        )
+
+        # Creating the oio moves the document to the zaak folder
+        oio = {
+            "object": self.zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        self.cmis_client.create_oio(oio)
+
+        # Creating a new document in the zaak folder
+        zaak_folders = self.cmis_client.query(
+            return_type_name="zaakfolder",
+            lhs=["drc:zaak__identificatie = '%s'"],
+            rhs=[self.zaak["identificatie"]],
+        )
+
+        self.assertEqual(len(zaak_folders), 1)
+        zaak_folder = zaak_folders[0]
+
+        self.cmis_client.create_document(
+            identification="58b8ebbf-0555-4989-b591-ee92550ae2f3",
+            data=properties,
+            content=content,
+            destination_folder=zaak_folder,
+        )
+
+        related_documents = self.cmis_client.get_documents_related_to_zaak(
+            identificatie=self.zaak["identificatie"]
+        )
+        self.assertEqual(len(related_documents), 2)
+
+    def test_link_document_in_zaakfolder_without_oio(self, m):
+        # Mocking the retrieval of the Zaken
+        m.get(self.zaak_url, json=self.zaak)
+        m.get(self.another_zaak_url, json=self.another_zaak)
+        mock_service_oas_get(m=m, service="zrc-openapi", url=self.base_zaak_url)
+
+        # Mocking the retrieval of the zaaktypes
+        m.get(self.zaaktype_url, json=self.zaaktype)
+        m.get(self.another_zaaktype_url, json=self.another_zaaktype)
+        mock_service_oas_get(m=m, service="ztc-openapi", url=self.base_zaaktype_url)
+
+        # Creating the document in the temporary folder
+        properties = {
+            "bronorganisatie": "159351741",
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "http://een.link",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+        }
+        content = io.BytesIO(b"some file content")
+
+        document = self.cmis_client.create_document(
+            identification="9124c668-db3f-4198-8823-4c21fed430d0",
+            data=properties,
+            content=content,
+        )
+
+        # Creating the oio moves the document to the zaak folder
+        oio = {
+            "object": self.zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "object_type": "zaak",
+        }
+        self.cmis_client.create_oio(oio)
+
+        # Creating a new document in the zaak folder
+        zaak_folders = self.cmis_client.query(
+            return_type_name="zaakfolder",
+            lhs=["drc:zaak__identificatie = '%s'"],
+            rhs=[self.zaak["identificatie"]],
+        )
+
+        self.assertEqual(len(zaak_folders), 1)
+        zaak_folder = zaak_folders[0]
+
+        new_document = self.cmis_client.create_document(
+            identification="58b8ebbf-0555-4989-b591-ee92550ae2f3",
+            data=properties,
+            content=content,
+            destination_folder=zaak_folder,
+        )
+
+        # Creating an oio that relates the new document to a different zaak should copy the document and not move it
+        oio = {
+            "object": self.another_zaak_url,
+            "informatieobject": f"https://testserver/api/v1/documenten/{new_document.uuid}",
+            "object_type": "zaak",
+        }
+        self.cmis_client.create_oio(oio)
+
+        # Refresh new document
+        new_document = self.cmis_client.get_document(drc_uuid=new_document.uuid)
+        self.assertEqual(
+            new_document.get_parent_folders()[0].objectId, zaak_folder.objectId
         )
 
 

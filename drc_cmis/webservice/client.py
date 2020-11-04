@@ -471,13 +471,18 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
             return Gebruiksrechten(extracted_data[0])
 
     def create_document(
-        self, identification: str, data: dict, content: BytesIO = None
+        self,
+        identification: str,
+        data: dict,
+        content: BytesIO = None,
+        destination_folder: Folder = None,
     ) -> Document:
         """Create a custom Document (with the EnkelvoudigInformatieObject properties)
 
         :param identification: string, the document ``identificatie``
         :param data: dict, the properties of the document
         :param content: BytesIO, the content of the document
+        :param destination_folder: Folder, the folder in which to place the document
         :return: Document, the document created
         """
 
@@ -494,7 +499,8 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
             content = BytesIO()
 
         # Create Document in default folder
-        other_folder = self.get_or_create_other_folder()
+        if destination_folder is None:
+            destination_folder = self.get_or_create_other_folder()
 
         properties = Document.build_properties(
             data, new=True, identification=identification
@@ -503,7 +509,7 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
         soap_envelope = make_soap_envelope(
             auth=(self.user, self.password),
             repository_id=self.main_repo_id,
-            folder_id=other_folder.objectId,
+            folder_id=destination_folder.objectId,
             properties=properties,
             cmis_action="createDocument",
             content_id=content_id,

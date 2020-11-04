@@ -290,12 +290,14 @@ class CMISDRCClient(CMISClient, CMISRequest):
         identification: str,
         data: dict,
         content: BytesIO = None,
+        destination_folder: Folder = None,
     ) -> Document:
         """Create a cmis document.
 
         :param identification: string, A unique identifier for the document.
         :param data: dict, A dict with all the data that needs to be saved on the document.
         :param content: BytesIO, The content of the document.
+        :param destination_folder: Folder, the folder in which to place the document
         :return: document
         """
         logger.debug("CMIS_CLIENT: create_document")
@@ -311,13 +313,14 @@ class CMISDRCClient(CMISClient, CMISRequest):
             content = BytesIO()
 
         # Create Document in default folder
-        other_folder = self.get_or_create_other_folder()
+        if destination_folder is None:
+            destination_folder = self.get_or_create_other_folder()
 
         properties = Document.build_properties(
             data, new=True, identification=identification
         )
 
-        data = create_json_request_body(other_folder, properties)
+        data = create_json_request_body(destination_folder, properties)
 
         json_response = self.post_request(self.root_folder_url, data=data)
         cmis_doc = Document(json_response)
