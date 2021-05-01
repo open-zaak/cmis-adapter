@@ -57,12 +57,13 @@ Tested against:
 * `Corsa platform`_ using CMIS 1.0 Web Services binding (Thanks to `BCT`_)
 * `Alfresco`_ Enterprise 5.2.3 using CMIS 1.1 Browser binding (Thanks to
   `Contezza`_)
-* `Alfresco CE 6.1.2-ga`_ (Used for CI)
+* `Alfresco CE`_ 6.1.2-ga and 6.2.0-ga using CMIS 1.1 Browser binding (Used for 
+  CI)
 
 .. _`Corsa platform`: https://www.bctsoftware.com/corsa/
 .. _`BCT`: https://www.bctsoftware.com/
 .. _`Contezza`: https://contezza.nl/
-.. _`Alfresco CE 6.1.2-ga`: https://hub.docker.com/layers/alfresco/alfresco-content-repository-community/6.1.2-ga/images/sha256-6edaf25aded1b16991f06be7754a7030c9d67429353e39ce1da3fd307a5f2e6f?context=explore
+.. _`Alfresco CE`: https://hub.docker.com/r/alfresco/alfresco-content-repository-community/tags?page=1&ordering=last_updated&name=-ga
 
 
 Installation

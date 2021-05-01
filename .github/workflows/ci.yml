@@ -17,13 +17,14 @@ jobs:
       matrix:
         python: ['3.7', '3.8']
         django: ['2.2']
+        alfresco: ['6.1.2-ga', '6.2.0-ga']
         binding: ['BROWSER', 'WEBSERVICE']
         cmisurlmapping: [ 'False', 'True' ]
         exclude:
           - binding: 'BROWSER'
             cmisurlmapping: 'True'
 
-    name: Tests (Py${{ matrix.python }}, Django ${{ matrix.django }}, ${{ matrix.binding }}, URL mapping = ${{ matrix.cmisurlmapping }})
+    name: Tests (Py${{ matrix.python }}, Django ${{ matrix.django }}, Alfresco ${{ matrix.alfresco }}, ${{ matrix.binding }}, URL mapping = ${{ matrix.cmisurlmapping }})
 
     steps:
       - uses: actions/checkout@v2
@@ -32,7 +33,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Bring up Alfresco
-        run: cd alfresco && docker-compose up -d
+        run: cd alfresco && docker-compose -f docker-compose-${{ matrix.alfresco }}.yml up -d
 
       - name: Install dependencies
         run: pip install tox tox-travis codecov
