@@ -16,7 +16,7 @@ from drc_cmis.browser.drc_document import (
     ZaakFolder,
     ZaakTypeFolder,
 )
-from drc_cmis.browser.request import CMISRequest
+from drc_cmis.browser.request import Request
 from drc_cmis.browser.utils import create_json_request_body
 from drc_cmis.client import CMISClient
 from drc_cmis.utils.exceptions import (
@@ -40,7 +40,7 @@ from drc_cmis.utils.utils import (
 logger = logging.getLogger(__name__)
 
 
-class CMISDRCClient(CMISClient, CMISRequest):
+class CMISDRCClient(CMISClient):
     """CMIS client for Browser binding (CMIS 1.1)"""
 
     document_type = Document
@@ -50,9 +50,81 @@ class CMISDRCClient(CMISClient, CMISRequest):
     zaakfolder_type = ZaakFolder
     zaaktypefolder_type = ZaakTypeFolder
 
+    _request = None
+    _repository_info = None
+
+    def get_request(self, url, params=None):
+        if not self._request:
+            self._request = Request()
+        return self._request.get_request(url, self.user, self.password, params)
+
+    def post_request(self, url, data, headers=None, files=None):
+        if not self._request:
+            self._request = Request()
+        return self._request.post_request(
+            url, data, self.user, self.password, headers, files
+        )
+
     @property
     def vendor(self) -> str:
         return self.repository_info["vendorName"]
+
+    @property
+    def base_url(self):
+        return self.config.client_url
+
+    @property
+    def time_zone(self):
+        return self.config.time_zone
+
+    @property
+    def root_folder_url(self):
+        return f"{self.base_url}/root"
+
+    @property
+    def user(self):
+        return self.config.client_user
+
+    @property
+    def password(self):
+        return self.config.client_password
+
+    @property
+    def repository_info(self) -> dict:
+        if not self._repository_info:
+            logger.debug(
+                "CMIS_ADAPTER: get_repository_info: GET request url: %s", self.base_url
+            )
+
+            response = self.get_request(self.base_url)
+
+            logger.debug("CMIS_ADAPTER: get_repository_info: response: %s", response)
+            self._repository_info = response["-default-"]
+
+        return self._repository_info
+
+    @property
+    def root_folder_id(self) -> str:
+        """Returns the objectId of the root folder"""
+        return self.repository_info["rootFolderId"]
+
+    def get_first_result(self, json, return_type):
+        if len(json.get("results")) == 0:
+            raise GetFirstException()
+
+        return return_type(json.get("results")[0])
+
+    def get_all_results(self, json, return_type):
+        results = []
+        for item in json.get("results"):
+            results.append(return_type(item))
+        return results
+
+    def get_all_objects(self, json, return_type):
+        objects = []
+        for item in json:
+            objects.append(return_type(item.get("object")))
+        return objects
 
     # generic querying
     def query(

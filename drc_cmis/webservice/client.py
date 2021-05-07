@@ -2,7 +2,7 @@ import logging
 import re
 import uuid
 from io import BytesIO
-from typing import List, Optional, Union
+from typing import BinaryIO, List, Optional, Tuple, Union
 from uuid import UUID
 
 from django.conf import settings
@@ -12,6 +12,7 @@ from cmislib.domain import CmisId
 
 from drc_cmis.client import CMISClient
 from drc_cmis.utils.exceptions import (
+    CmisRepositoryDoesNotExist,
     CmisRuntimeException,
     CmisUpdateConflictException,
     DocumentDoesNotExistError,
@@ -46,19 +47,22 @@ from drc_cmis.webservice.drc_document import (
     ZaakFolder,
     ZaakTypeFolder,
 )
-from drc_cmis.webservice.request import SOAPCMISRequest
+from drc_cmis.webservice.request import SOAPRequest
 from drc_cmis.webservice.utils import (
     extract_object_properties_from_xml,
+    extract_repository_ids_from_xml,
     extract_xml_from_soap,
     make_soap_envelope,
     pretty_xml,
     shrink_url,
 )
 
+from .fetcher import repo_info_fetcher
+
 logger = logging.getLogger(__name__)
 
 
-class SOAPCMISClient(CMISClient, SOAPCMISRequest):
+class SOAPCMISClient(CMISClient):
     """CMIS client for Web service binding (CMIS 1.0)"""
 
     document_type = Document
@@ -67,6 +71,108 @@ class SOAPCMISClient(CMISClient, SOAPCMISRequest):
     folder_type = Folder
     zaakfolder_type = ZaakFolder
     zaaktypefolder_type = ZaakTypeFolder
+
+    _main_repo_id = None
+    _repository_info = None
+    _request = None
+
+    def request(
+        self,
+        path: str,
+        soap_envelope: str,
+        attachments: Optional[List[Tuple[str, BinaryIO]]] = None,
+        keep_binary: bool = False,
+    ) -> Union[str, bytes]:
+        """Make request with MTOM attachment.
+
+        :param path: string, path where to post the request
+        :param soap_envelope: string, XML which can contain zero or more references to attachments
+        (in the form of `cid:<contentId>`)
+        :param attachments: list of tuples, each tuple contains the content ID used in the XML (string) and the I/O
+        stream for the attachment.
+        :param keep_binary: whether to keep the body of the response as binary or convert it to a string.
+        :return: string or bytes, the content of the response
+        """
+        if not self._request:
+            self._request = SOAPRequest(self.base_url)
+        return self._request.request(
+            path, soap_envelope, attachments=attachments, keep_binary=keep_binary
+        )
+
+    @property
+    def user(self):
+        return self.config.client_user
+
+    @property
+    def password(self):
+        return self.config.client_password
+
+    @property
+    def base_url(self):
+        """Return the base URL
+
+        For example, for Alfresco running locally the base URL for SOAP requests is
+        http://localhost:8082/alfresco/cmisws
+        """
+        return self.config.client_url
+
+    @property
+    def main_repo_id(self) -> str:
+        """Get ID of the CMS main repository"""
+        return self.get_main_repo_id()
+
+    def get_main_repo_id(self, cache: bool = True) -> str:
+        configured_main_repo_id = self.config.main_repo_id
+        if configured_main_repo_id and cache:
+            return configured_main_repo_id
+
+        if self._main_repo_id is None:
+            # Retrieving the IDs of all repositories in the CMS
+            soap_envelope = make_soap_envelope(
+                auth=(self.user, self.password), cmis_action="getRepositories"
+            )
+
+            logger.debug(soap_envelope.toprettyxml())
+
+            soap_response = self.request(
+                "RepositoryService", soap_envelope=soap_envelope.toxml()
+            )
+
+            xml_response = extract_xml_from_soap(soap_response)
+            logger.debug(pretty_xml(xml_response))
+
+            all_repositories_ids = extract_repository_ids_from_xml(xml_response)
+
+            # If no main repository ID is configured, take the ID of the first repository returned.
+            if configured_main_repo_id == "":
+                self._main_repo_id = all_repositories_ids[0]
+            else:
+                if configured_main_repo_id not in all_repositories_ids:
+                    raise CmisRepositoryDoesNotExist(
+                        "The configured repository ID does not exist."
+                    )
+
+                self._main_repo_id = configured_main_repo_id
+
+        return self._main_repo_id
+
+    @property
+    def repository_info(self) -> dict:
+        if not self._repository_info:
+            self._repository_info = self.fetch_repository_info()
+        return self._repository_info
+
+    def fetch_repository_info(self) -> dict:
+        """Fetch the repository info and cache it"""
+        logger.debug("Fetching information for repository %s", self.main_repo_id)
+        return repo_info_fetcher.fetch(
+            self.main_repo_id, self.base_url, self.user, self.password
+        )
+
+    @property
+    def root_folder_id(self) -> str:
+        """Get the ID of the folder where all folders/documents will be created"""
+        return self.repository_info["root_folder_id"]
 
     @property
     def vendor(self) -> str:

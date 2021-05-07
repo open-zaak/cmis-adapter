@@ -31,7 +31,6 @@ from drc_cmis.webservice.data_models import (
     get_cmis_type,
     get_type,
 )
-from drc_cmis.webservice.request import SOAPCMISRequest
 from drc_cmis.webservice.utils import (
     expand_url,
     extract_content,
@@ -45,22 +44,21 @@ from drc_cmis.webservice.utils import (
 logger = logging.getLogger(__name__)
 
 
-class CMISBaseObject(SOAPCMISRequest):
+class CMISBaseObject:
     name_map = None
     type_name = None
     type_class = None
 
     def __init__(self, data):
         super().__init__()
+
+        from drc_cmis.webservice.client import SOAPCMISClient
+
         self.data = data
         self.properties = dict(data.get("properties", {}))
+        self.client = SOAPCMISClient()
 
     def __getattr__(self, name: str):
-        try:
-            return super(SOAPCMISRequest, self).__getattribute__(name)
-        except AttributeError:
-            pass
-
         def resolve_attribute(name: str) -> str:
             if name in self.properties:
                 return self.properties[name]["value"]
@@ -139,14 +137,14 @@ class CMISContentObject(CMISBaseObject):
         """Delete all versions of an object"""
 
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             object_id=self.objectId,
             cmis_action="deleteObject",
         )
         logger.debug(soap_envelope.toprettyxml())
 
-        soap_response = self.request(
+        soap_response = self.client.request(
             "ObjectService", soap_envelope=soap_envelope.toxml()
         )
 
@@ -157,14 +155,14 @@ class CMISContentObject(CMISBaseObject):
         """Get all the parent folders of an object"""
 
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             object_id=self.objectId,
             cmis_action="getObjectParents",
         )
         logger.debug(soap_envelope.toprettyxml())
 
-        soap_response = self.request(
+        soap_response = self.client.request(
             "NavigationService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
@@ -181,8 +179,8 @@ class CMISContentObject(CMISBaseObject):
         source_folder = self.get_parent_folders()[0]
 
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             object_id=self.objectId,
             target_folder_id=target_folder.objectId,
             source_folder_id=source_folder.objectId,
@@ -190,7 +188,7 @@ class CMISContentObject(CMISBaseObject):
         )
         logger.debug(soap_envelope.toprettyxml())
 
-        soap_response = self.request(
+        soap_response = self.client.request(
             "ObjectService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
@@ -209,15 +207,15 @@ class CMISContentObject(CMISBaseObject):
         :return: dict, properties of the updated object
         """
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             properties=properties,
             cmis_action="updateProperties",
             object_id=self.objectId,
         )
         logger.debug(soap_envelope.toprettyxml())
 
-        soap_response = self.request(
+        soap_response = self.client.request(
             "ObjectService",
             soap_envelope=soap_envelope.toxml(),
         )
@@ -239,14 +237,14 @@ class CMISContentObject(CMISBaseObject):
         :return: CMISContentObject
         """
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             object_id=object_id,
             cmis_action="getObject",
         )
         logger.debug(soap_envelope.toprettyxml())
 
-        soap_response = self.request(
+        soap_response = self.client.request(
             "ObjectService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
@@ -356,8 +354,8 @@ class Document(CMISContentObject):
         """Checkout a private working copy of the document"""
 
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             cmis_action="checkOut",
             object_id=str(self.objectId),
         )
@@ -365,7 +363,7 @@ class Document(CMISContentObject):
 
         # FIXME temporary solution due to alfresco raising a 500 AFTER locking the document
         try:
-            soap_response = self.request(
+            soap_response = self.client.request(
                 "VersioningService", soap_envelope=soap_envelope.toxml()
             )
             xml_response = extract_xml_from_soap(soap_response)
@@ -382,8 +380,8 @@ class Document(CMISContentObject):
 
     def checkin(self, checkin_comment: str, major: bool = True) -> "Document":
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             cmis_action="checkIn",
             object_id=str(self.objectId),
             major=str(major).lower(),
@@ -391,7 +389,7 @@ class Document(CMISContentObject):
         )
         logger.debug(soap_envelope.toprettyxml())
 
-        soap_response = self.request(
+        soap_response = self.client.request(
             "VersioningService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
@@ -405,13 +403,13 @@ class Document(CMISContentObject):
     def get_all_versions(self) -> List["Document"]:
         object_id = self.objectId.split(";")[0]
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             cmis_action="getAllVersions",
             object_id=object_id,
         )
         logger.debug(soap_envelope.toprettyxml())
-        soap_response = self.request(
+        soap_response = self.client.request(
             "VersioningService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)
@@ -439,14 +437,14 @@ class Document(CMISContentObject):
 
     def get_content_stream(self) -> BytesIO:
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             object_id=self.objectId,
             cmis_action="getContentStream",
         )
         logger.debug(soap_envelope.toprettyxml())
 
-        soap_response = self.request(
+        soap_response = self.client.request(
             "ObjectService", soap_envelope=soap_envelope.toxml(), keep_binary=True
         )
 
@@ -461,8 +459,8 @@ class Document(CMISContentObject):
         attachments = [(content_id, content)]
 
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             object_id=self.objectId,
             cmis_action="setContentStream",
             content_id=content_id,
@@ -470,7 +468,7 @@ class Document(CMISContentObject):
         )
         logger.debug(soap_envelope.toprettyxml())
 
-        soap_response = self.request(
+        soap_response = self.client.request(
             "ObjectService",
             soap_envelope=soap_envelope.toxml(),
             attachments=attachments,
@@ -490,14 +488,14 @@ class Document(CMISContentObject):
 
         if latest_version.isVersionSeriesCheckedOut:
             soap_envelope = make_soap_envelope(
-                auth=(self.user, self.password),
-                repository_id=self.main_repo_id,
+                auth=(self.client.user, self.client.password),
+                repository_id=self.client.main_repo_id,
                 object_id=latest_version.objectId,
                 cmis_action="cancelCheckOut",
             )
             logger.debug(soap_envelope.toprettyxml())
 
-            soap_response = self.request(
+            soap_response = self.client.request(
                 "VersioningService",
                 soap_envelope=soap_envelope.toxml(),
             )
@@ -517,15 +515,15 @@ class Document(CMISContentObject):
         query = CMISQuery("SELECT * FROM drc:document WHERE drc:document__uuid = '%s'")
 
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             statement=query(self.uuid),
             cmis_action="query",
         )
         logger.debug(soap_envelope.toprettyxml())
 
         try:
-            soap_response = self.request(
+            soap_response = self.client.request(
                 "DiscoveryService", soap_envelope=soap_envelope.toxml()
             )
         # Corsa raises an error for queries that return no results
@@ -593,15 +591,15 @@ class Folder(CMISBaseObject):
         query = CMISQuery(f"SELECT * FROM {object_type_id} WHERE cmis:parentId = '%s'")
 
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             statement=query(str(self.objectId)),
             cmis_action="query",
         )
         logger.debug(soap_envelope.toprettyxml())
 
         try:
-            soap_response = self.request(
+            soap_response = self.client.request(
                 "DiscoveryService", soap_envelope=soap_envelope.toxml()
             )
         # Corsa raises an error if the query retrieves 0 results
@@ -621,15 +619,15 @@ class Folder(CMISBaseObject):
 
         # With Corsa, locked documents cause an error, so 'continue_on_failure' is needed
         soap_envelope = make_soap_envelope(
-            auth=(self.user, self.password),
-            repository_id=self.main_repo_id,
+            auth=(self.client.user, self.client.password),
+            repository_id=self.client.main_repo_id,
             folder_id=self.objectId,
             cmis_action="deleteTree",
             continue_on_failure="true",
         )
         logger.debug(soap_envelope.toprettyxml())
 
-        soap_response = self.request(
+        soap_response = self.client.request(
             "ObjectService", soap_envelope=soap_envelope.toxml()
         )
         xml_response = extract_xml_from_soap(soap_response)

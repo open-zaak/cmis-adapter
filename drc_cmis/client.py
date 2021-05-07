@@ -35,14 +35,22 @@ class CMISClient:
     folder_type = None
     zaakfolder_type = None
     zaaktypefolder_type = None
+    _config = None
+
+    @property
+    def config(self):
+        """
+        Lazily load the config so that no DB queries are done while Django is starting.
+        """
+        if not self._config:
+            self._config = CMISConfig.get_solo()
+        return self._config
 
     def get_other_base_folder_name(self):
-        config = CMISConfig.objects.get()
-        return config.get_other_base_folder_name()
+        return self.config.get_other_base_folder_name()
 
     def get_zaak_base_folder_name(self):
-        config = CMISConfig.objects.get()
-        return config.get_zaak_base_folder_name()
+        return self.config.get_zaak_base_folder_name()
 
     def get_return_type(self, type_name: str) -> type:
         error_message = f"No class {type_name} exists for this client."
@@ -127,11 +135,12 @@ class CMISClient:
 
     def delete_cmis_folders_in_base(self):
         """Delete all the folders in the base folders"""
-        config = CMISConfig.get_solo()
-
         root_folder = self.get_folder(self.root_folder_id)
         for folder_name in set(
-            [config.get_zaak_base_folder_name(), config.get_other_base_folder_name()]
+            [
+                self.config.get_zaak_base_folder_name(),
+                self.config.get_other_base_folder_name(),
+            ]
         ):
             try:
                 folder = self.get_folder_by_name(folder_name, root_folder)
@@ -344,8 +353,7 @@ class CMISClient:
 
     def get_or_create_zaak_folder(self, zaaktype: dict, zaak: dict) -> Folder:
         """Get or create all the folders in the configurable 'zaak' folder path"""
-        cmis_config = CMISConfig.get_solo()
-        path_elements = folder_utils.get_folder_structure(cmis_config.zaak_folder_path)
+        path_elements = folder_utils.get_folder_structure(self.config.zaak_folder_path)
 
         parent_folder = self.get_folder(self.root_folder_id)
         now = timezone.now()
@@ -385,8 +393,7 @@ class CMISClient:
 
     def get_or_create_other_folder(self) -> Folder:
         """Get or create all the folders in the configurable 'other' folder path"""
-        cmis_config = CMISConfig.get_solo()
-        path_elements = folder_utils.get_folder_structure(cmis_config.other_folder_path)
+        path_elements = folder_utils.get_folder_structure(self.config.other_folder_path)
 
         parent_folder = self.get_folder(self.root_folder_id)
         now = timezone.now()

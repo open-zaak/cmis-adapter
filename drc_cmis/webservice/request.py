@@ -1,30 +1,21 @@
 import logging
 from typing import BinaryIO, List, Optional, Tuple, Union
 
+from drc_cmis.connections import get_session
 from drc_cmis.utils.exceptions import (
     CmisBaseException,
     CmisInvalidArgumentException,
     CmisNotSupportedException,
     CmisObjectNotFoundException,
     CmisPermissionDeniedException,
-    CmisRepositoryDoesNotExist,
     CmisRuntimeException,
     CmisUpdateConflictException,
 )
-from drc_cmis.webservice.utils import (
-    extract_repo_info_from_xml,
-    extract_repository_ids_from_xml,
-    extract_xml_from_soap,
-    make_soap_envelope,
-    pretty_xml,
-)
-
-from ..connections import get_session
 
 logger = logging.getLogger(__name__)
 
 
-class SOAPCMISRequest:
+class SOAPRequest:
     _boundary = "------=_Part_52_1132425564.1594208078802"
 
     _headers = {
@@ -40,105 +31,13 @@ class SOAPCMISRequest:
         "Content-ID": "<rootpart@soapui.org>",
     }
 
-    _main_repo_id = None
-    _repository_info = None
+    def __init__(self, base_url):
+        self.base_url = base_url
 
     @property
     def session(self):
         # Uses a thread-local session object to enable connection pooling
         return get_session()
-
-    @property
-    def config(self):
-        """
-        Lazily load the config so that no DB queries are done while Django is starting.
-        """
-        from drc_cmis.models import CMISConfig
-
-        return CMISConfig.get_solo()
-
-    @property
-    def user(self):
-        return self.config.client_user
-
-    @property
-    def password(self):
-        return self.config.client_password
-
-    @property
-    def base_url(self):
-        """Return the base URL
-
-        For example, for Alfresco running locally the base URL for SOAP requests is
-        http://localhost:8082/alfresco/cmisws
-        """
-        return self.config.client_url
-
-    @property
-    def main_repo_id(self) -> str:
-        """Get ID of the CMS main repository"""
-        return self.get_main_repo_id()
-
-    def get_main_repo_id(self, cache: bool = True) -> str:
-        configured_main_repo_id = self.config.main_repo_id
-        if configured_main_repo_id and cache:
-            return configured_main_repo_id
-
-        if self._main_repo_id is None:
-            # Retrieving the IDs of all repositories in the CMS
-            soap_envelope = make_soap_envelope(
-                auth=(self.user, self.password), cmis_action="getRepositories"
-            )
-
-            logger.debug(soap_envelope.toprettyxml())
-
-            soap_response = self.request(
-                "RepositoryService", soap_envelope=soap_envelope.toxml()
-            )
-
-            xml_response = extract_xml_from_soap(soap_response)
-            logger.debug(pretty_xml(xml_response))
-
-            all_repositories_ids = extract_repository_ids_from_xml(xml_response)
-
-            # If no main repository ID is configured, take the ID of the first repository returned.
-            if configured_main_repo_id == "":
-                self._main_repo_id = all_repositories_ids[0]
-            else:
-                if configured_main_repo_id not in all_repositories_ids:
-                    raise CmisRepositoryDoesNotExist(
-                        "The configured repository ID does not exist."
-                    )
-
-                self._main_repo_id = configured_main_repo_id
-
-        return self._main_repo_id
-
-    @property
-    def repository_info(self) -> dict:
-        if not self._repository_info:
-            soap_envelope = make_soap_envelope(
-                auth=(self.user, self.password),
-                repository_id=self.main_repo_id,
-                cmis_action="getRepositoryInfo",
-            )
-
-            logger.debug(soap_envelope.toprettyxml())
-
-            soap_response = self.request(
-                "RepositoryService", soap_envelope=soap_envelope.toxml()
-            )
-
-            xml_response = extract_xml_from_soap(soap_response)
-            logger.debug(pretty_xml(xml_response))
-            self._repository_info = extract_repo_info_from_xml(xml_response)
-
-        return self._repository_info
-
-    @property
-    def root_folder_id(self) -> str:
-        """Get the ID of the folder where all folders/documents will be created"""
-        return self.repository_info["root_folder_id"]
 
     def request(
         self,
