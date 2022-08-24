@@ -35,3 +35,10 @@ Locations
 #. You can find the CMIS 1.0 SOAP binding endpoint at::
 
     http://localhost:8082/alfresco/cmisws/cmis?wsdl
+
+
+Content model and extension
+===========================
+
+See https://github.com/open-zaak/alfresco-content-model for the image with custom
+content model and extension configuration.
