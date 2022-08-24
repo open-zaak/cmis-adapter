@@ -25,6 +25,7 @@ from drc_cmis.utils.exceptions import (
     DocumentDoesNotExistError,
     DocumentExistsError,
     DocumentLockedException,
+    DocumentSizeMismatchException,
     FolderDoesNotExistError,
     GetFirstException,
     LockDidNotMatchException,
@@ -438,6 +439,18 @@ class CMISDRCClient(CMISClient):
         """Unlock a document with objectId workspace://SpacesStore/<uuid>"""
         cmis_doc = self.get_document(drc_uuid)
         pwc = cmis_doc.get_private_working_copy()
+
+        # If bestandsomvang is explicitly defined, but does not match the actual size
+        # of the content, that means that the upload has not been completed yet ->
+        # the document cannot be unlocked yet
+        if (
+            not force
+            and pwc.bestandsomvang
+            and pwc.bestandsomvang != pwc.contentStreamLength
+        ):
+            raise DocumentSizeMismatchException(
+                "`Document.bestandsomvang` does not match the actual size of the uploaded document."
+            )
 
         if constant_time_compare(pwc.lock, lock) or force:
             pwc.update_properties({mapper("lock"): ""})

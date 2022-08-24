@@ -227,6 +227,15 @@
                         <facetable>false</facetable>
                     </index>
                 </property>
+                <property name="drc:document__bestandsomvang">
+                    <title>DRC - Document - Bestandsomvang</title>
+                    <type>d:long</type>
+                    <mandatory>false</mandatory>
+                    <index enabled="false">
+                        <tokenised>false</tokenised>
+                        <facetable>false</facetable>
+                    </index>
+                </property>
                 <property name="drc:document__creatiedatum">
                     <title>DRC - Document - Creatiedatum</title>
                     <type>d:date</type>

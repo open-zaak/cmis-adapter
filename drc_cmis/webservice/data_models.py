@@ -23,6 +23,7 @@ class EnkelvoudigInformatieObject:
     integriteit_waarde: str
     titel: str
     bestandsnaam: str
+    bestandsomvang: int
     formaat: str
     ondertekening_soort: str
     beschrijving: str
@@ -97,6 +98,7 @@ class ZaakTypeFolderData:
 
 
 CONVERTER = {
+    int: "propertyInteger",
     str: "propertyString",
     date: "propertyDateTime",
     datetime: "propertyDateTime",

@@ -35,6 +35,10 @@ class LockDidNotMatchException(DMSException):
     pass
 
 
+class DocumentSizeMismatchException(DMSException):
+    pass
+
+
 class GetFirstException(Exception):
     pass
 

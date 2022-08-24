@@ -140,14 +140,14 @@ def extract_content_stream_properties_from_xml(xml_data: str) -> dict:
 
 # FIXME find a better way to do this
 def extract_content(soap_response_body: bytes) -> BytesIO:
-    content = re.search(
+    match = re.search(
         "Content-Disposition: attachment;.+?\r\n\r\n(.+?)\r\n--uuid:.+?--".encode(
             "utf-8"
         ),
         soap_response_body,
         re.DOTALL,
-    ).group(1)
-
+    )
+    content = match.group(1) if match else b""
     return BytesIO(content)
 
 

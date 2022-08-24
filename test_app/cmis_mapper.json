@@ -19,7 +19,7 @@
         "titel": "drc:document__titel",
         "bestandsnaam": "drc:document__bestandsnaam",
         "formaat": "drc:document__formaat",
-        "bestandsomvang": "cmis:contentStreamLength",
+        "bestandsomvang": "drc:document__bestandsomvang",
         "versie": "drc:document__versie",
         "beschrijving": "drc:document__beschrijving",
         "verzenddatum": "drc:document__verzenddatum",
