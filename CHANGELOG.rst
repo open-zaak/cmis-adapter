@@ -2,6 +2,17 @@
 Changelog
 =========
 
+1.5.0 (2022-08-24)
+------------------
+
+* Support writes for ``bestandsomvang`` attribute
+* Allow writing of empty files
+* CI: Use same Alfresco docker image in CI as Open Zaak
+* Dropped support for Django 2.2
+
+.. note:: This update requires the CMIS content model to be updated with a writeable
+   ``Document.bestandsomvang`` attribute.
+
 1.4.0 (2022-07-26)
 ------------------
 
