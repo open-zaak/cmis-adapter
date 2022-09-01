@@ -2,6 +2,11 @@
 Changelog
 =========
 
+1.5.1 (2022-09-01)
+------------------
+
+Fixed ``None`` / empty values in the WEBSERVICE binding.
+
 1.5.0 (2022-08-24)
 ------------------
 
