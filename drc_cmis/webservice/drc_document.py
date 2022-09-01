@@ -314,6 +314,9 @@ class Document(CMISContentObject):
             elif key == "indicatie_gebruiksrecht":
                 prop_type = get_cmis_type(EnkelvoudigInformatieObject, key)
                 props[prop_name] = {"value": "", "type": prop_type}
+            elif key == "bestandsomvang" and value is None:
+                prop_type = get_cmis_type(EnkelvoudigInformatieObject, key)
+                props[prop_name] = {"value": None, "type": prop_type}
 
         # For documents that are not new, the uuid shouldn't be written
         props.pop(mapper("uuid"), None)

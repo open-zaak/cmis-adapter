@@ -2070,6 +2070,45 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
                 drc_uuid=document.uuid, lock=str(uuid.uuid4()), data=new_properties
             )
 
+    def test_update_document_to_null_bestandsomvang(self):
+        identification = str(uuid.uuid4())
+        properties = {
+            "creatiedatum": timezone.now(),
+            "titel": "detailed summary",
+            "auteur": "test_auteur",
+            "formaat": "txt",
+            "taal": "eng",
+            "bestandsnaam": "dummy.txt",
+            "link": "https://drc.utrechtproeftuin.nl/api/v1/enkelvoudiginformatieobjecten/d06f86e0-1c3a-49cf-b5cd-01c079cf8147/download",
+            "beschrijving": "test_beschrijving",
+            "vertrouwelijkheidaanduiding": "openbaar",
+            "uuid": str(uuid.uuid4()),
+        }
+        content = io.BytesIO(b"Content before update")
+
+        document = self.cmis_client.create_document(
+            identification=identification,
+            data=properties,
+            content=content,
+            bronorganisatie="159351741",
+        )
+
+        new_properties = {"bestandsomvang": None}
+        new_content = None
+
+        lock = str(uuid.uuid4())
+        self.cmis_client.lock_document(drc_uuid=document.uuid, lock=lock)
+        self.cmis_client.update_document(
+            drc_uuid=document.uuid, lock=lock, data=new_properties, content=new_content
+        )
+        updated_doc = self.cmis_client.unlock_document(
+            drc_uuid=document.uuid, lock=lock
+        )
+
+        self.assertIsNone(updated_doc.bestandsomvang)
+        posted_content = updated_doc.get_content_stream()
+        self.assertEqual(posted_content.read(), b"")
+
     def test_copy_document(self):
         # Create first document
         identification = str(uuid.uuid4())

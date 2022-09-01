@@ -281,10 +281,12 @@ def make_soap_envelope(
             property_element = xml_doc.createElement(f"ns1:{prop_dict['type']}")
             property_element.setAttribute("propertyDefinitionId", prop_name)
 
-            value_element = xml_doc.createElement("ns1:value")
-            value_text = xml_doc.createTextNode(prop_dict["value"])
-            value_element.appendChild(value_text)
-            property_element.appendChild(value_element)
+            value = prop_dict["value"]
+            if value is not None:
+                value_element = xml_doc.createElement("ns1:value")
+                value_text = xml_doc.createTextNode(value)
+                value_element.appendChild(value_text)
+                property_element.appendChild(value_element)
 
             properties_element.appendChild(property_element)
         action_element.appendChild(properties_element)
