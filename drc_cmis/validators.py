@@ -48,6 +48,16 @@ def zaak_folder_path_validator(path: str):
     folder_path_validator(path, path_element_templates)
 
 
+def verzoek_folder_path_validator(path: str):
+    path_element_templates = [
+        folder.YEAR_PATH_ELEMENT_TEMPLATE,
+        folder.MONTH_PATH_ELEMENT_TEMPLATE,
+        folder.DAY_PATH_ELEMENT_TEMPLATE,
+        folder.VERZOEK_PATH_ELEMENT_TEMPLATE,
+    ]
+    folder_path_validator(path, path_element_templates)
+
+
 def other_folder_path_validator(path: str):
     path_element_templates = [
         folder.YEAR_PATH_ELEMENT_TEMPLATE,

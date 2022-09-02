@@ -159,6 +159,32 @@ class CMISClientFolderTests(DMSMixin, TestCase):
         self.assertEqual("zaak-1bcfd0d6-c817-428c-a3f4-4047038c184d", zaak_folder.name)
         self.assertEqual(zaak_folder.objectTypeId, "F:drc:zaakfolder")
 
+    def test_create_verzoek_folder(self):
+        # Test that no 'other' folder is present
+        root_folder = self.cmis_client.get_folder(self.cmis_client.root_folder_id)
+        document_root = root_folder.get_child_folder(name="TestDRC")
+        self.assertIsNone(document_root)
+
+        # Create the 'verzoek' folder
+        self.cmis_client.get_or_create_verzoek_folder(
+            verzoek={"identificatie": "VZ-0001"}
+        )
+
+        # Test the path created
+        document_root = root_folder.get_child_folder(name="TestDRC")
+        self.assertIsNotNone(document_root)
+
+        verzoeken_folder = document_root.get_child_folder(name="Verzoeken")
+        self.assertIsNotNone(verzoeken_folder)
+        year_folder = verzoeken_folder.get_child_folder(name="2020")
+        self.assertIsNotNone(year_folder)
+        month_folder = year_folder.get_child_folder(name="7")
+        self.assertIsNotNone(month_folder)
+        day_folder = month_folder.get_child_folder(name="27")
+        self.assertIsNotNone(day_folder)
+        verzoek_folder = day_folder.get_child_folder(name="verzoek-VZ-0001")
+        self.assertIsNotNone(verzoek_folder)
+
     def test_get_repository_info(self):
         properties = self.cmis_client.repository_info
 

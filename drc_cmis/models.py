@@ -13,6 +13,7 @@ from .utils.folder import get_folder_structure
 from .validators import (
     other_folder_path_validator,
     url_mapping_validator,
+    verzoek_folder_path_validator,
     zaak_folder_path_validator,
 )
 
@@ -59,6 +60,12 @@ class CMISConfig(SingletonModel):
         default="/DRC/{{ zaaktype }}/{{ year }}/{{ month }}/{{ day }}/{{ zaak }}/",
         validators=[zaak_folder_path_validator],
         help_text=_("The path where documents related to zaken are saved."),
+    )
+    verzoek_folder_path = models.CharField(
+        max_length=500,
+        default="/DRC/Verzoeken/{{ year }}/{{ month }}/{{ day }}/{{ verzoek }}/",
+        validators=[verzoek_folder_path_validator],
+        help_text=_("The path where documents related to verzoeken are saved."),
     )
     other_folder_path = models.CharField(
         max_length=500,

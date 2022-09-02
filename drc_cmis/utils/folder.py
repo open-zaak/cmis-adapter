@@ -27,6 +27,10 @@ ZAAK_PATH_ELEMENT_TEMPLATE = PathElementTemplate(
     folder_name="{{ zaak }}",
     required=True,
 )
+VERZOEK_PATH_ELEMENT_TEMPLATE = PathElementTemplate(
+    folder_name="{{ verzoek }}",
+    required=True,
+)
 
 
 def get_folder_structure(path: str) -> List[PathElement]:

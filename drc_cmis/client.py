@@ -228,7 +228,11 @@ class CMISClient:
         return gebruiksrechten.update_properties(diff_properties)
 
     def create_oio(
-        self, oio_data: dict, zaak_data: dict = None, zaaktype_data: dict = None
+        self,
+        oio_data: dict,
+        zaak_data: Optional[dict] = None,
+        zaaktype_data: Optional[dict] = None,
+        other_data: Optional[dict] = None,
     ) -> ObjectInformatieObject:
         """Create ObjectInformatieObject which relates a document with a zaak or besluit
 
@@ -269,15 +273,12 @@ class CMISClient:
         if "object" in oio_data:
             oio_data[oio_data["object_type"]] = oio_data.pop("object")
 
-        # If the related object is a besluit not related to a zaak,
-        # the oio for the besluit is created in the "Related data" of the temporary folder
-        if zaak_data is None and oio_data["object_type"] == "besluit":
-            destination_folder = self.get_or_create_other_folder()
-        else:
-            # Get or create the destination folder
-            destination_folder = self.get_or_create_zaak_folder(
-                zaaktype_data, zaak_data
-            )
+        destination_folder = self._get_or_create_destination_folder(
+            object_type=oio_data["object_type"],
+            zaak_data=zaak_data,
+            zaaktype_data=zaaktype_data,
+            other_data=other_data,
+        )
 
         related_data_folder = self.get_or_create_folder(
             "Related data", destination_folder
@@ -314,6 +315,31 @@ class CMISClient:
         return self.create_content_object(
             data=oio_data, object_type="oio", destination_folder=related_data_folder
         )
+
+    def _get_or_create_destination_folder(
+        self,
+        object_type: str,
+        zaak_data: Optional[dict] = None,
+        zaaktype_data: Optional[dict] = None,
+        other_data: Optional[dict] = None,
+    ):
+        assert object_type in [
+            "zaak",
+            "besluit",
+            "verzoek",
+        ], f"Unknown object type '{object_type}'"
+
+        if object_type == "verzoek":
+            if not other_data:
+                return self.get_or_create_other_folder()
+            return self.get_or_create_verzoek_folder(verzoek=other_data)
+
+        # If the related object is a besluit not related to a zaak,
+        # the oio for the besluit is created in the "Related data" of the temporary folder
+        if object_type == "besluit" and zaak_data is None:
+            return self.get_or_create_other_folder()
+
+        return self.get_or_create_zaak_folder(zaaktype_data, zaak_data)
 
     def create_gebruiksrechten(self, data: dict) -> Gebruiksrechten:
         """Create gebruiksrechten
@@ -387,6 +413,32 @@ class CMISClient:
             folder_utils.ZAAK_PATH_ELEMENT_TEMPLATE.folder_name: (
                 f"zaak-{zaak['identificatie']}",
                 zaak_properties,
+            ),
+        }
+
+        for pe in path_elements:
+            folder_name, props = ctx.get(pe.folder_name, (pe.folder_name, {}))
+
+            parent_folder = self.get_or_create_folder(folder_name, parent_folder, props)
+
+        return parent_folder
+
+    def get_or_create_verzoek_folder(self, verzoek: dict) -> Folder:
+        """Get or create all the folders in the configurable 'zaak' folder path"""
+        path_elements = folder_utils.get_folder_structure(
+            self.config.verzoek_folder_path
+        )
+
+        parent_folder = self.get_folder(self.root_folder_id)
+        now = timezone.now()
+
+        ctx = {
+            folder_utils.YEAR_PATH_ELEMENT_TEMPLATE.folder_name: (str(now.year), {}),
+            folder_utils.MONTH_PATH_ELEMENT_TEMPLATE.folder_name: (str(now.month), {}),
+            folder_utils.DAY_PATH_ELEMENT_TEMPLATE.folder_name: (str(now.day), {}),
+            folder_utils.VERZOEK_PATH_ELEMENT_TEMPLATE.folder_name: (
+                f"verzoek-{verzoek['identificatie']}",
+                {},
             ),
         }
 
