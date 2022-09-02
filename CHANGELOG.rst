@@ -2,6 +2,12 @@
 Changelog
 =========
 
+1.6.0 (2022-09-02)
+------------------
+
+* Improved support for OIO type "verzoek"
+* Added configuration option for Verzoeken folder path
+
 1.5.1 (2022-09-01)
 ------------------
 

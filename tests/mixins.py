@@ -1,7 +1,7 @@
 import os
 
 from drc_cmis.client_builder import get_cmis_client
-from drc_cmis.models import CMISConfig, Vendor
+from drc_cmis.models import CMISConfig
 
 
 class DMSMixin:
@@ -17,6 +17,7 @@ class DMSMixin:
                 client_password="admin",
                 zaak_folder_path="/TestZaken/{{ zaaktype }}/{{ year }}/{{ month }}/{{ day }}/{{ zaak }}/",
                 other_folder_path="/TestDRC/{{ year }}/{{ month }}/{{ day }}/",
+                verzoek_folder_path="/TestDRC/Verzoeken/{{ year }}/{{ month }}/{{ day }}/{{ verzoek }}/",
             )
         elif os.getenv("CMIS_BINDING") == "WEBSERVICE":
             CMISConfig.objects.create(
@@ -26,6 +27,7 @@ class DMSMixin:
                 client_password="admin",
                 zaak_folder_path="/TestZaken/{{ zaaktype }}/{{ year }}/{{ month }}/{{ day }}/{{ zaak }}/",
                 other_folder_path="/TestDRC/{{ year }}/{{ month }}/{{ day }}/",
+                verzoek_folder_path="/TestDRC/Verzoeken/{{ year }}/{{ month }}/{{ day }}/{{ verzoek }}/",
             )
         else:
             raise Exception(
