@@ -1,6 +1,5 @@
 include *.rst
 include LICENSE
-include test_app/cmis_mapper.json
 recursive-include drc_cmis *.html
 recursive-include drc_cmis *.js
 recursive-include drc_cmis *.css
