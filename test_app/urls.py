@@ -19,5 +19,5 @@ urlpatterns = [
         TemplateView.as_view(),
         name="objectinformatieobject-detail",
     ),
-    path("ref/", include("vng_api_common.notifications.urls")),
+    path("ref/", include("notifications_api_common.urls")),
 ]

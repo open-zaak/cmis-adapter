@@ -15,7 +15,7 @@ class EnkelvoudigInformatieObject(models.Model):
     beschrijving = models.TextField(max_length=1000)
     ontvangstdatum = models.DateField(null=True, blank=True)
     verzenddatum = models.DateField(null=True, blank=True)
-    indicatie_gebruiksrecht = models.NullBooleanField(blank=True, default=None)
+    indicatie_gebruiksrecht = models.BooleanField(blank=True, default=None, null=True)
     ondertekening_soort = models.CharField(max_length=10, blank=True)
     ondertekening_datum = models.DateField(blank=True, null=True)
     informatieobjecttype = models.URLField()
