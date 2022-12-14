@@ -2,6 +2,15 @@
 Changelog
 =========
 
+1.7.0 (2022-12-14)
+------------------
+
+Swapped out vng-api-common with commonground-api-common dependency.
+
+This change should be 100% backwards compatible in terms of code, however if your
+downstream project also uses vng-api-common, these dependencies conflict and you should
+replace it with commonground-api-common in your own project too.
+
 1.6.0 (2022-09-02)
 ------------------
 
