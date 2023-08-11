@@ -16,6 +16,7 @@ from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,
+    VERZENDING_MAP,
     ZAAK_MAP,
     ZAAKTYPE_MAP,
     mapper,
@@ -433,6 +434,12 @@ class ObjectInformatieObject(RearrangeFilesOnDeleteMixin, CMISContentObject):
             return
 
         return Gebruiksrechten(gebruiksrechten_files[0])
+
+
+class Verzending(CMISContentObject):
+    table = "drc:verzending"
+    name_map = VERZENDING_MAP
+    type_name = "verzending"
 
 
 class Folder(CMISBaseObject):

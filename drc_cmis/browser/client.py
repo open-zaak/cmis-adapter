@@ -268,18 +268,19 @@ class CMISDRCClient(CMISClient):
     def create_content_object(
         self, data: dict, object_type: str, destination_folder: Folder = None
     ) -> CMISContentObject:
-        """Create a Gebruiksrechten or a ObjectInformatieObject
+        """Create a Gebruiksrechten, a ObjectInformatieObject or a Verzending
 
         :param data: dict, properties of the object to create
         :param object_type: string, either "gebruiksrechten" or "oio"
         :param destination_folder: Folder, a folder where to create the object. If not provided,
             the object will be placed in a temporary folder.
-        :return: Either a Gebruiksrechten or ObjectInformatieObject
+        :return: Either a Gebruiksrechten, ObjectInformatieObject or Verzending
         """
         assert object_type in [
             "gebruiksrechten",
             "oio",
-        ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
+            "verzending",
+        ], "'object_type' can be only 'gebruiksrechten', 'oio' or 'verzending'"
 
         if destination_folder is None:
             other_folder = self.get_or_create_other_folder()
@@ -327,21 +328,24 @@ class CMISDRCClient(CMISClient):
             return Gebruiksrechten(json_response)
         elif object_type == "oio":
             return ObjectInformatieObject(json_response)
+        elif object_type == "verzendong":
+            return
 
     def get_content_object(
         self, drc_uuid: Union[str, UUID], object_type: str
     ) -> CMISContentObject:
-        """Get the gebruiksrechten/oio with specified uuid
+        """Get the gebruiksrechten/oio/verzending with specified uuid
 
-        :param drc_uuid: string or UUID, the value of drc:oio__uuid or drc:gebruiksrechten__uuid
+        :param drc_uuid: string or UUID, the value of drc:oio__uuid, drc:gebruiksrechten__uuid or drc:verzending__uuid
         :param object_type: string, either "gebruiksrechten" or "oio"
-        :return: Either a Gebruiksrechten or ObjectInformatieObject
+        :return: Either a Gebruiksrechten, ObjectInformatieObject or Verzending
         """
 
         assert object_type in [
             "gebruiksrechten",
             "oio",
-        ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
+            "verzending",
+        ], "'object_type' can be only 'gebruiksrechten', 'oio' or 'verzending'"
 
         query = CMISQuery("SELECT * FROM drc:%s WHERE drc:%s__uuid = '%s'")
 

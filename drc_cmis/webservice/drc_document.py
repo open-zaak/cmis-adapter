@@ -16,6 +16,7 @@ from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,
+    VERZENDING_MAP,
     ZAAK_MAP,
     ZAAKTYPE_MAP,
     mapper,
@@ -28,6 +29,7 @@ from drc_cmis.webservice.data_models import (
     Gebruiksrechten as GebruiksrechtenDoc,
     Oio as OioDoc,
     QueriableUrl,
+    Verzending as VerzendingDoc,
     ZaakFolderData,
     ZaakTypeFolderData,
     get_cmis_type,
@@ -618,6 +620,13 @@ class ObjectInformatieObject(RearrangeFilesOnDeleteMixin, CMISContentObject):
                     self.zaakfolder.name,
                     self.informatieobject,
                 )
+
+
+class Verzending(CMISContentObject):
+    table = "drc:verzending"
+    name_map = VERZENDING_MAP
+    type_name = "verzending"
+    type_class = VerzendingDoc
 
 
 class Folder(CMISBaseObject):

@@ -22,6 +22,7 @@ Document = TypeVar("Document")
 Gebruiksrechten = TypeVar("Gebruiksrechten")
 Folder = TypeVar("Folder")
 ObjectInformatieObject = TypeVar("ObjectInformatieObject")
+Verzending = TypeVar("Verzending")
 
 
 class CMISClient:
@@ -31,6 +32,7 @@ class CMISClient:
     document_type = None
     gebruiksrechten_type = None
     oio_type = None
+    verzending_type = None
     folder_type = None
     zaakfolder_type = None
     zaaktypefolder_type = None
@@ -61,6 +63,7 @@ class CMISClient:
             "document",
             "gebruiksrechten",
             "oio",
+            "verzending",
         ], error_message
 
         if type_name == "folder":
@@ -71,6 +74,8 @@ class CMISClient:
             return self.gebruiksrechten_type
         elif type_name == "oio":
             return self.oio_type
+        elif type_name == "verzending":
+            return self.verzending_type
         elif type_name == "zaaktype":
             return self.zaaktypefolder_type
         elif type_name == "zaak":
@@ -88,7 +93,7 @@ class CMISClient:
         if self.vendor.lower() == Vendor.alfresco:
             if object_type in ["zaaktypefolder", "zaakfolder"]:
                 return "F:"
-            if object_type in ["document", "oio", "gebruiksrechten"]:
+            if object_type in ["document", "oio", "gebruiksrechten", "verzending"]:
                 return "D:"
 
         return ""
@@ -340,6 +345,23 @@ class CMISClient:
 
         return self.get_or_create_zaak_folder(zaaktype_data, zaak_data)
 
+    def create_related_object(self, data: dict, object_type: str) -> TypeVar:
+        """
+        Create object in the 'Related data' folder in the folder
+        of the related document
+        """
+        document_uuid = data.get("informatieobject").split("/")[-1]
+        document = self.get_document(drc_uuid=document_uuid)
+
+        parent_folder = document.get_parent_folders()[0]
+        related_data_folder = self.get_or_create_folder("Related data", parent_folder)
+
+        return self.create_content_object(
+            data=data,
+            object_type=object_type,
+            destination_folder=related_data_folder,
+        )
+
     def create_gebruiksrechten(self, data: dict) -> Gebruiksrechten:
         """Create gebruiksrechten
 
@@ -350,17 +372,7 @@ class CMISClient:
         :return: Gebruiksrechten
         """
 
-        document_uuid = data.get("informatieobject").split("/")[-1]
-        document = self.get_document(drc_uuid=document_uuid)
-
-        parent_folder = document.get_parent_folders()[0]
-        related_data_folder = self.get_or_create_folder("Related data", parent_folder)
-
-        return self.create_content_object(
-            data=data,
-            object_type="gebruiksrechten",
-            destination_folder=related_data_folder,
-        )
+        return self.create_related_object(data, "gebruiksrechten")
 
     def delete_content_object(self, drc_uuid: Union[str, UUID], object_type: str):
         """Delete the gebruiksrechten/objectinformatieobject with specified uuid
@@ -467,3 +479,15 @@ class CMISClient:
             parent_folder = self.get_or_create_folder(folder_name, parent_folder, props)
 
         return parent_folder
+
+    def create_verzending(self, data: dict) -> Verzending:
+        """Create verzending
+
+        The verzending is created in the 'Related data' folder in the folder
+        of the related document
+
+        :param data: dict, data of the verzending
+        :return: Verzending
+        """
+
+        return self.create_related_object(data, "verzending")

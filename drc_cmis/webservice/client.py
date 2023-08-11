@@ -35,6 +35,7 @@ from drc_cmis.webservice.data_models import (
     Gebruiksrechten as GebruiksRechtDoc,
     Oio,
     QueriableUrl,
+    Verzending as VerzendingDoc,
     get_cmis_type,
     get_type,
 )
@@ -45,6 +46,7 @@ from drc_cmis.webservice.drc_document import (
     Folder,
     Gebruiksrechten,
     ObjectInformatieObject,
+    Verzending,
     ZaakFolder,
     ZaakTypeFolder,
 )
@@ -514,16 +516,17 @@ class SOAPCMISClient(CMISClient):
     def create_content_object(
         self, data: dict, object_type: str, destination_folder: Folder = None
     ) -> CMISContentObject:
-        """Create a Gebruiksrechten or a ObjectInformatieObject
+        """Create a Gebruiksrechten, a ObjectInformatieObject or Verzending
 
         :param data: dict, properties of the object to create
-        :param object_type: string, either "gebruiksrechten" or "oio"
+        :param object_type: string, either "gebruiksrechten", "oio" or "verzending"
         :param destination_folder: Folder, the folder in which to place the object
-        :return: Either a Gebruiksrechten or ObjectInformatieObject
+        :return: Either a Gebruiksrechten, ObjectInformatieObject or Verzending
         """
         assert object_type in [
             "gebruiksrechten",
             "oio",
+            "verzending",
         ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
 
         if object_type == "oio":
@@ -532,6 +535,9 @@ class SOAPCMISClient(CMISClient):
         elif object_type == "gebruiksrechten":
             return_type = Gebruiksrechten
             data_class = GebruiksRechtDoc
+        elif object_type == "verzending":
+            return_type = Verzending
+            data_class = VerzendingDoc
 
         if destination_folder is None:
             other_folder = self.get_or_create_other_folder()
@@ -603,17 +609,18 @@ class SOAPCMISClient(CMISClient):
     def get_content_object(
         self, drc_uuid: Union[str, UUID], object_type: str
     ) -> CMISContentObject:
-        """Get the gebruiksrechten/oio with specified uuid
+        """Get the gebruiksrechten/oio/verzending with specified uuid
 
         :param drc_uuid: string or UUID, the value of drc:oio__uuid or drc:gebruiksrechten__uuid
-        :param object_type: string, either "gebruiksrechten" or "oio"
-        :return: Either a Gebruiksrechten or ObjectInformatieObject
+        :param object_type: string, either "gebruiksrechten", "oio" or "verzending"
+        :return: Either a Gebruiksrechten, ObjectInformatieObject or Verzending
         """
 
         assert object_type in [
             "gebruiksrechten",
             "oio",
-        ], "'object_type' can be only 'gebruiksrechten' or 'oio'"
+            "verzending",
+        ], "'object_type' can be only 'gebruiksrechten', 'oio' or 'verzending'"
 
         query = CMISQuery("SELECT * FROM drc:%s WHERE drc:%s__uuid = '%s'")
 
@@ -654,6 +661,8 @@ class SOAPCMISClient(CMISClient):
             return ObjectInformatieObject(extracted_data[0])
         elif object_type == "gebruiksrechten":
             return Gebruiksrechten(extracted_data[0])
+        elif object_type == "verzendding":
+            return Verzending(extracted_data[0])
 
     def create_document(
         self,

@@ -9,6 +9,7 @@ from drc_cmis.utils.mapper import (
     DOCUMENT_MAP,
     GEBRUIKSRECHTEN_MAP,
     OBJECTINFORMATIEOBJECT_MAP,
+    VERZENDING_MAP,
     ZAAK_MAP,
     ZAAKTYPE_MAP,
 )
@@ -26,6 +27,7 @@ class CMISConfig(AppConfig):
             "DOCUMENT_MAP": DOCUMENT_MAP,
             "GEBRUIKSRECHTEN_MAP": GEBRUIKSRECHTEN_MAP,
             "OBJECTINFORMATIEOBJECT_MAP": OBJECTINFORMATIEOBJECT_MAP,
+            "VERZENDING_MAP": VERZENDING_MAP,
         }
 
         mapper_file_path = settings.CMIS_MAPPER_FILE

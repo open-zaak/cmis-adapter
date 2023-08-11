@@ -77,6 +77,41 @@ class Oio:
 
 
 @dataclass
+class Verzending:
+    uuid: str
+    object_type_id: Id
+    betrokkene: Url
+
+    aard_relatie: str
+    toelichting: str
+    ontvangstdatum: date
+    verzenddatum: date
+    contact_persoon: Url
+    contactpersoonnaam: str
+    binnenlands_correspondentieadres_huisletter: str
+    binnenlands_correspondentieadres_huisnummer: int
+    binnenlands_correspondentieadres_huisnummer_toevoeging: str
+    binnenlands_correspondentieadres_naam_openbare_ruimte: str
+    binnenlands_correspondentieadres_postcode: str
+    binnenlands_correspondentieadres_woonplaatsnaam: str
+    buitenlands_correspondentieadres_adres_buitenland_1: str
+    buitenlands_correspondentieadres_adres_buitenland_2: str
+    buitenlands_correspondentieadres_adres_buitenland_3: str
+    buitenlands_correspondentieadres_land_postadres: Url
+    correspondentie_postadres_postbus_of_antwoord_nummer: int
+    correspondentie_postadres_postcode: str
+    correspondentie_postadres_postadrestype: str
+    correspondentie_postadres_woonplaatsnaam: str
+    faxnummer: str
+    emailadres: str
+    mijn_overheid: bool
+    telefoonnummer: str
+
+    informatieobject: QueriableUrl
+    kopie_van: str
+
+
+@dataclass
 class Folder:
     object_type_id: Id
 
