@@ -484,6 +484,27 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
                 drc_uuid=gebruiksrechten.uuid, object_type="gebruiksrechten"
             )
 
+    def test_create_verzending(self):
+        properties = {
+            "betrokkene": "http://example.com/betrokkene/1",
+            "informatieobject": "https://drc.utrechtproeftuin.nl/api/v1/enkelvoudiginformatieobjecten/d06f86e0-1c3a-49cf-b5cd-01c079cf8147",
+            "aard_relatie": "afzender",
+            "toelichting": "inner shipment",
+            "contact_persoon": "http://example.com/contactperson/1",
+            "binnenlands_correspondentieadres_huisletter": "A",
+            "binnenlands_correspondentieadres_huisnummer": 10,
+            "binnenlands_correspondentieadres_huisnummer_toevoeging": "1",
+            "binnenlands_correspondentieadres_naam_openbare_ruimte": "Amsterdam ruimte",
+            "binnenlands_correspondentieadres_postcode": "1010AA",
+            "binnenlands_correspondentieadres_woonplaatsnaam": "Amsterdam",
+        }
+
+        verzending = self.cmis_client.create_content_object(
+            data=properties, object_type="verzending"
+        )
+
+        self.assertIsNotNone(verzending.uuid)
+
 
 @freeze_time("2020-07-27 12:00:00")
 class CMISClientOIOTests(DMSMixin, TestCase):
