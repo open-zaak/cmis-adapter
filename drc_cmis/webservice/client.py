@@ -71,6 +71,7 @@ class SOAPCMISClient(CMISClient):
     document_type = Document
     gebruiksrechten_type = Gebruiksrechten
     oio_type = ObjectInformatieObject
+    verzending_type = Verzending
     folder_type = Folder
     zaakfolder_type = ZaakFolder
     zaaktypefolder_type = ZaakTypeFolder

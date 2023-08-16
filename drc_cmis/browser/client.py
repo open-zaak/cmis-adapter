@@ -13,6 +13,7 @@ from drc_cmis.browser.drc_document import (
     Folder,
     Gebruiksrechten,
     ObjectInformatieObject,
+    Verzending,
     ZaakFolder,
     ZaakTypeFolder,
 )
@@ -47,6 +48,7 @@ class CMISDRCClient(CMISClient):
     document_type = Document
     gebruiksrechten_type = Gebruiksrechten
     oio_type = ObjectInformatieObject
+    verzending_type = Verzending
     folder_type = Folder
     zaakfolder_type = ZaakFolder
     zaaktypefolder_type = ZaakTypeFolder
