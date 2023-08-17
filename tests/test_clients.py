@@ -1639,6 +1639,7 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
             "link": "https://drc.utrechtproeftuin.nl/api/v1/enkelvoudiginformatieobjecten/d06f86e0-1c3a-49cf-b5cd-01c079cf8147/download",
             "beschrijving": "test_beschrijving",
             "vertrouwelijkheidaanduiding": "openbaar",
+            "verschijningsvorm": "test vorm",
         }
         content = io.BytesIO(b"some file content")
 
@@ -1668,6 +1669,7 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
         )
         self.assertEqual(document.beschrijving, "test_beschrijving")
         self.assertEqual(document.vertrouwelijkheidaanduiding, "openbaar")
+        self.assertEqual(document.verschijningsvorm, "test vorm")
 
         self.assertIsNotNone(document.contentStreamId)
         self.assertEqual(document.contentStreamLength, len("some file content"))

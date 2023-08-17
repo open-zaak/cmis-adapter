@@ -40,6 +40,7 @@
         "link": "drc:document__link",
         "creatiedatum": "drc:document__creatiedatum",
         "lock": "drc:document__lock",
+        "verschijningsvorm": "drc:document__verschijningsvorm",
         "kopie_van": "drc:kopie_van"
     },
     "OBJECTINFORMATIEOBJECT_MAP": {
