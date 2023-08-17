@@ -73,3 +73,6 @@ class CMISConfig(AppConfig):
         mapper.REVERSE_OBJECTINFORMATIEOBJECT_MAP = {
             value: key for key, value in OBJECTINFORMATIEOBJECT_MAP.items()
         }
+        mapper.REVERSE_VERZENDING_MAP = {
+            value: key for key, value in VERZENDING_MAP.items()
+        }
