@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("drc_cmis", "0007_cmisconfig_time_zone"),
     ]

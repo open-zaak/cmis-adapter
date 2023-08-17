@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("drc_cmis", "0013_auto_20201216_1046"),
         ("drc_cmis", "0014_auto_20210106_1602"),

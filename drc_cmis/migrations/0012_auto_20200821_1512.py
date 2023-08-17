@@ -6,7 +6,6 @@ import drc_cmis.validators
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("drc_cmis", "0011_auto_20200813_1640"),
     ]
