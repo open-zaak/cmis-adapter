@@ -47,6 +47,7 @@ class EnkelvoudigInformatieObject:
     lock: str
     uuid: str
     integriteit_algoritme: str
+    verschijningsvorm: str
     kopie_van: str
 
 

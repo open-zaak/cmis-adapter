@@ -93,6 +93,7 @@ def make_enkelvoudiginformatieobject_dataclass(cmis_doc, dataclass, skip_deleted
         ),
         versie=cmis_doc.versie,
         locked=bool(cmis_doc.versionSeriesCheckedOutId),
+        verschijningsvorm=cmis_doc.verschijningsvorm,
     )
 
 

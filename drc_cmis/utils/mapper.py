@@ -42,6 +42,7 @@ DOCUMENT_MAP = {
     "verwijderd": None,
     "begin_registratie": None,
     "lock": None,
+    "verschijningsvorm": None,
     "kopie_van": None,
 }
 
