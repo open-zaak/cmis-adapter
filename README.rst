@@ -232,6 +232,22 @@ something else.
 
 The mapping between API-attributes and CMIS properties can be found in the `cmis_mapper.json`_.
 
+**Verzending**
+
+Delivery of the documents (added in Documenten API 1.2).
+
++-------------------------+---------------------------------+
+| Documenten API resource | ``Verzending``                  |
++-------------------------+---------------------------------+
+| CMIS objecttype \*      | ``drc:verzending``              |
++-------------------------+---------------------------------+
+| CMIS basetype           | ``cmis:document``               |
++-------------------------+---------------------------------+
+| CMIS-mapper object      | ``VERZENDING_MAP``              |
++-------------------------+---------------------------------+
+
+The mapping between API-attributes and CMIS properties can be found in the `cmis_mapper.json`_.
+
 **Zaaktype folder**
 
 Contains all Zaken from this Zaaktype and has itself some meta data about the
@@ -329,6 +345,20 @@ For example:
 
     CMIS Root > DRC > 2020 > 12 > 31 > document.txt
     CMIS Root > DRC > 2020 > 12 > 31 > Related data > document.txt-gebruiksrechten
+
+**Creating verzending**
+
+A document can have Verzending. Similar to Gebruiksrechten they are stored as
+a separate document (``verzending``) in a folder called ``Related data``.
+This folder is always in the same folder as the document itself and is of type
+``cmis:folder``.
+
+For example:
+
+.. code-block::
+
+    CMIS Root > DRC > 2020 > 12 > 31 > document.txt
+    CMIS Root > DRC > 2020 > 12 > 31 > Related data > document.txt-verzending
 
 **Relating a document to a Zaak**
 
