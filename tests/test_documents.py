@@ -232,7 +232,6 @@ class CMISDocumentTests(DMSMixin, TestCase):
         self.assertIsNotNone(built_properties["drc:document__uuid"])
 
         for prop_name, prop_value in built_properties.items():
-
             if prop_name.split("__")[-1] in properties:
                 converted_prop_name = prop_name.split("__")[-1]
                 self.assertEqual(properties[converted_prop_name], prop_value)
@@ -1196,7 +1195,6 @@ class CMISFolderTests(DMSMixin, TestCase):
     )
     @override_settings(CMIS_URL_MAPPING_ENABLED=True)
     def test_build_zaakfolder_properties_webservice_mapping(self):
-
         from drc_cmis.webservice.drc_document import ZaakFolder
 
         properties = {
@@ -1243,7 +1241,6 @@ class CMISFolderTests(DMSMixin, TestCase):
     )
     @override_settings(CMIS_URL_MAPPING_ENABLED=False)
     def test_build_zaakfolder_properties_webservice(self):
-
         from drc_cmis.webservice.drc_document import ZaakFolder
 
         properties = {
@@ -1277,7 +1274,6 @@ class CMISFolderTests(DMSMixin, TestCase):
     )
     @override_settings(CMIS_URL_MAPPING_ENABLED=True)
     def test_build_zaaktypefolder_properties_webservice_mapping(self):
-
         from drc_cmis.webservice.drc_document import ZaakTypeFolder
 
         properties = {
@@ -1318,7 +1314,6 @@ class CMISFolderTests(DMSMixin, TestCase):
     )
     @override_settings(CMIS_URL_MAPPING_ENABLED=False)
     def test_build_zaaktypefolder_properties_webservice(self):
-
         from drc_cmis.webservice.drc_document import ZaakTypeFolder
 
         properties = {

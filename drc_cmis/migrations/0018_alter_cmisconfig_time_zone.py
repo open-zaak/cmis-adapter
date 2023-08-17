@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("drc_cmis", "0017_cmisconfig_verzoek_folder_path"),
     ]

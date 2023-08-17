@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("drc_cmis", "0006_cmisconfig_binding"),
     ]

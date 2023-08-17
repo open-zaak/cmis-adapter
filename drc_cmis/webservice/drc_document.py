@@ -436,7 +436,6 @@ class Document(CMISContentObject):
         self.set_content_stream(content, filename)
 
     def update_properties(self, properties: dict) -> "Document":
-
         updated_properties = self._update_properties(properties)
         return self.get_document(updated_properties["properties"]["objectId"]["value"])
 
@@ -738,7 +737,6 @@ class Folder(CMISBaseObject):
     def get_children_documents(
         self, convert_to_document_type: bool = True
     ) -> List[Union[Document, dict]]:
-
         soap_envelope = make_soap_envelope(
             auth=(self.client.user, self.client.password),
             repository_id=self.client.main_repo_id,

@@ -6,7 +6,6 @@ import drc_cmis.validators
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("drc_cmis", "0016_alter_cmisconfig_time_zone"),
     ]

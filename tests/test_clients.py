@@ -332,7 +332,6 @@ class CMISClientContentObjectsTests(DMSMixin, TestCase):
             self.cmis_client.create_content_object(data={}, object_type="wrongtype")
 
     def test_folder_structure_when_content_object_is_created(self):
-
         root_folder = self.cmis_client.get_folder(self.cmis_client.root_folder_id)
         document_root = root_folder.get_child_folder(name="TestDRC")
         self.assertIsNone(document_root)
@@ -1628,7 +1627,6 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
         )
 
     def test_create_document_with_content(self):
-
         identification = str(uuid.uuid4())
         properties = {
             "uuid": str(uuid.uuid4()),
@@ -1680,7 +1678,6 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
         self.assertEqual(posted_content.read(), content.read())
 
     def test_create_document_without_content(self):
-
         identification = str(uuid.uuid4())
         properties = {
             "uuid": str(uuid.uuid4()),
@@ -1755,7 +1752,6 @@ class CMISClientDocumentTests(DMSMixin, TestCase):
         self.assertIsNotNone(document.uuid)
 
     def test_create_document_with_dates_and_datetimes(self):
-
         identification = str(uuid.uuid4())
         properties = {
             "begin_registratie": timezone.now(),
@@ -2295,7 +2291,6 @@ class CMISQueryTest(DMSMixin, TestCase):
         )
 
     def test_retrieve_documents(self):
-
         # Create first document with one informatieobjecttype
         properties_1 = {
             "uuid": "d06f86e0-1c3a-49cf-b5cd-01c079cf8147",

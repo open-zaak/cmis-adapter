@@ -25,7 +25,6 @@ ObjectInformatieObject = TypeVar("ObjectInformatieObject")
 
 
 class CMISClient:
-
     _main_repo_id = None
     _root_folder_id = None
 

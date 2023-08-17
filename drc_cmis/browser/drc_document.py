@@ -164,7 +164,6 @@ class Document(CMISContentObject):
 
     @classmethod
     def build_properties(cls, data: dict, new: bool = True) -> dict:
-
         props = {}
         for key, value in data.items():
             prop_name = mapper(key, type="document")

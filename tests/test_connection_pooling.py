@@ -42,7 +42,6 @@ def test_context_manager(requests_mock):
     requests_mock.get("https://example.com/2")
 
     with patch("requests.Session.close") as mock_close:
-
         with use_cmis_connection_pool() as session:
             r1 = session.get("https://example.com/1")
             r2 = session.get("https://example.com/2")
