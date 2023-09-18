@@ -1531,7 +1531,7 @@ class CMISClientGebruiksrechtenTests(DMSMixin, TestCase):
 
         # Create gebruiksrechten
         gebruiksrechten_data = {
-            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "informatieobject": f"https://drc.utrechtproeftuin.nl/api/v1/documenten/{document.uuid}",
             "startdatum": "2018-12-24T00:00:00Z",
             "omschrijving_voorwaarden": "Test voorwaarden",
         }
@@ -1543,7 +1543,7 @@ class CMISClientGebruiksrechtenTests(DMSMixin, TestCase):
         self.assertEqual("Test voorwaarden", gebruiksrechten.omschrijving_voorwaarden)
 
         updated_data = {
-            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "informatieobject": f"https://drc.utrechtproeftuin.nl/api/v1/documenten/{document.uuid}",
             "startdatum": "2018-12-24T00:00:00Z",
             "omschrijving_voorwaarden": "Aangepaste voorwaarden",
         }
@@ -1582,7 +1582,7 @@ class CMISClientGebruiksrechtenTests(DMSMixin, TestCase):
 
         # Create gebruiksrechten
         gebruiksrechten_data = {
-            "informatieobject": f"https://testserver/api/v1/documenten/{document.uuid}",
+            "informatieobject": f"https://drc.utrechtproeftuin.nl/api/v1/documenten/{document.uuid}",
             "startdatum": "2018-12-24T00:00:00Z",
             "omschrijving_voorwaarden": "Test voorwaarden",
         }

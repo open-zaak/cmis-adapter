@@ -35,18 +35,18 @@ jobs:
         run: cd alfresco && docker-compose up -d
 
       - name: Install dependencies
-        run: pip install tox tox-gh-actions codecov
+        run: pip install tox tox-gh-actions
 
       - name: Run tests
-        run: |
-          export TOXENV=py${PYTHON_VERSION/./}-django${DJANGO/./}-$(echo $CMIS_BINDING | tr '[:upper:]' '[:lower:]')
-          tox
-          codecov -e TOXENV,DJANGO --file reports/coverage-${TOXENV}.xml
+        run: tox
         env:
           PYTHON_VERSION: ${{ matrix.python }}
           DJANGO: ${{ matrix.django }}
           CMIS_BINDING: ${{ matrix.binding }}
           CMIS_URL_MAPPING_ENABLED: ${{ matrix.cmisurlmapping }}
+
+      - name: Publish coverage report
+        uses: codecov/codecov-action@v3
 
   publish:
     name: Publish package to PyPI

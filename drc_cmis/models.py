@@ -5,7 +5,6 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 import pytz
-from djchoices import ChoiceItem, DjangoChoices
 from solo.models import SingletonModel
 
 from .utils.exceptions import NoOtherBaseFolderException, NoZaakBaseFolderException
@@ -99,9 +98,9 @@ class CMISConfig(SingletonModel):
         raise ImproperlyConfigured("The 'other_folder_path' must be configured.")
 
 
-class Vendor(DjangoChoices):
-    alfresco = ChoiceItem()
-    bct = ChoiceItem()
+class Vendor(models.TextChoices):
+    alfresco = "alfresco"
+    bct = "bct"
 
 
 class UrlMapping(models.Model):
