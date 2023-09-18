@@ -2,6 +2,11 @@
 Changelog
 =========
 
+1.8.0 (2023-09-18)
+------------------
+
+Remove django-choices dependency and migrate to native Django choices enums.
+
 1.7.0 (2022-12-14)
 ------------------
 
