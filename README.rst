@@ -2,7 +2,7 @@
 Documenten API CMIS adapter
 ===========================
 
-:Version: 1.7.0
+:Version: 1.8.0
 :Source: https://github.com/open-zaak/cmis-adapter
 :Keywords: CMIS, Documenten API, VNG, Common Ground
 :PythonVersion: 3.7
