@@ -304,9 +304,9 @@ class CMISDRCClient(CMISClient):
         if "cmis:objectTypeId" in properties.keys():
             json_data["propertyValue[2]"] = properties.pop("cmis:objectTypeId")
         else:
-            json_data[
-                "propertyValue[2]"
-            ] = f"{self.get_object_type_id_prefix(object_type)}drc:{object_type}"
+            json_data["propertyValue[2]"] = (
+                f"{self.get_object_type_id_prefix(object_type)}drc:{object_type}"
+            )
 
         prop_count = 3
         for prop_key, prop_value in properties.items():
