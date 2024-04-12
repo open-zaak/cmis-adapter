@@ -12,7 +12,7 @@ from drc_cmis.webservice.client import SOAPCMISClient
 
 try:
     from zgw_consumers.client import get_client_class
-except ImportError:
+except (ImportError, RuntimeError):
 
     def get_client_class() -> Type[Client]:
         return Client

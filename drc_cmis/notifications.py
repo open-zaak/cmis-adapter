@@ -1,6 +1,7 @@
 """
 Listen to the notifications that are send by the NRC
 """
+
 from vng_api_common.notifications.handlers import RoutingHandler, default
 
 from drc_cmis.client_builder import get_cmis_client, get_zds_client

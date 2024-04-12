@@ -37,9 +37,9 @@ def parseDateTimeValue(value):
     """
     Utility function to return a datetime from a string.
     """
-    if type(value) == str:
+    if isinstance(value, str):
         return iso8601.parse_date(value)
-    elif type(value) == int:
+    elif isinstance(value, int):
         return datetime.fromtimestamp(value / 1000)
     else:
         return None
