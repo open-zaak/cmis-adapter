@@ -2,6 +2,13 @@
 Changelog
 =========
 
+1.9.0 (2024-04-12)
+------------------
+
+* Supported Django 4.2
+* Supported python 3.11
+* Dropped support of python 3.7, python 3.8, python 3.9
+
 1.8.0 (2023-09-18)
 ------------------
 
