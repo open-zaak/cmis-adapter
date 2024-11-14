@@ -32,7 +32,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Bring up Alfresco
-        run: cd alfresco && docker-compose up -d
+        run: cd alfresco && docker compose up -d
 
       - name: Install dependencies
         run: pip install tox tox-gh-actions
