@@ -2,6 +2,11 @@
 Changelog
 =========
 
+1.9.1 (2024-11-14)
+------------------
+
+* Remove unused notifications handler (to remove zds-client imports)
+
 1.9.0 (2024-04-12)
 ------------------
 
