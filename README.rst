@@ -2,10 +2,10 @@
 Documenten API CMIS adapter
 ===========================
 
-:Version: 1.9.0
+:Version: 1.9.1
 :Source: https://github.com/open-zaak/cmis-adapter
 :Keywords: CMIS, Documenten API, VNG, Common Ground
-:PythonVersion: 3.7
+:PythonVersion: 3.10
 
 |build-status| |coverage| |linting| |black| |python-versions| |django-versions| |pypi-version|
 
@@ -74,7 +74,7 @@ included and does not require separate installation.**
 Requirements
 ------------
 
-* Python 3.7 or above
+* Python 3.10 or above
 * setuptools 30.3.0 or above
 * Django 3.2 or newer
 
